@@ -43,21 +43,31 @@ export interface ToolCall {
     rawOutput?: unknown;
 }
 
+interface PendingRequest {
+    resolve: (v: unknown) => void;
+    reject: (e: Error) => void;
+    timeout: NodeJS.Timeout;
+    method: string;
+    idleTimeoutMs?: number;
+}
+
 export class AcpClient extends EventEmitter {
     private proc: ChildProcess | null = null;
     private nextId = 1;
-    private pendingRequests = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timeout: NodeJS.Timeout }>();
+    private pendingRequests = new Map<number, PendingRequest>();
     private buffer = '';
     private initialized = false;
     private sessionId: string | null = null;
     private hermesPath: string;
     private requestTimeoutMs: number;
+    private streamIdleTimeoutMs: number;
     private stopping = false;
 
-    constructor(hermesPath: string, requestTimeoutMs = 180_000) {
+    constructor(hermesPath: string, requestTimeoutMs = 30_000, streamIdleTimeoutMs = 120_000) {
         super();
         this.hermesPath = hermesPath;
         this.requestTimeoutMs = requestTimeoutMs;
+        this.streamIdleTimeoutMs = streamIdleTimeoutMs;
     }
 
     private getWorkspaceRoots(): string[] {
@@ -191,6 +201,7 @@ export class AcpClient extends EventEmitter {
         switch (notif.method) {
             case 'session/update':
                 if (params) {
+                    this.resetIdleTimers();
                     this.emit('sessionUpdate', {
                         sessionId: params.sessionId as string,
                         update: params.update,
@@ -249,18 +260,26 @@ export class AcpClient extends EventEmitter {
         this.send({ jsonrpc: '2.0', id, error: { code, message } } as JsonRpcResponse);
     }
 
-    private request<T = unknown>(method: string, params?: unknown): Promise<T> {
+    private request<T = unknown>(method: string, params?: unknown, options?: { idleTimeoutMs?: number }): Promise<T> {
         const id = this.nextId++;
+        const idleTimeoutMs = options?.idleTimeoutMs;
+        const totalTimeoutMs = idleTimeoutMs ?? this.requestTimeoutMs;
         return new Promise<T>((resolve, reject) => {
-            const timeout = setTimeout(() => {
+            const onTimeout = () => {
                 this.pendingRequests.delete(id);
-                reject(new Error(`Hermes ACP request timed out after ${Math.round(this.requestTimeoutMs / 1000)}s: ${method}`));
-            }, this.requestTimeoutMs);
+                const reason = idleTimeoutMs
+                    ? `Hermes ACP stream went silent for ${Math.round(totalTimeoutMs / 1000)}s: ${method}`
+                    : `Hermes ACP request timed out after ${Math.round(totalTimeoutMs / 1000)}s: ${method}`;
+                reject(new Error(reason));
+            };
+            const timeout = setTimeout(onTimeout, totalTimeoutMs);
 
             this.pendingRequests.set(id, {
                 resolve: resolve as (v: unknown) => void,
                 reject,
                 timeout,
+                method,
+                idleTimeoutMs,
             });
 
             try {
@@ -271,6 +290,26 @@ export class AcpClient extends EventEmitter {
                 reject(err instanceof Error ? err : new Error(String(err)));
             }
         });
+    }
+
+    private resetIdleTimers(): void {
+        for (const pending of this.pendingRequests.values()) {
+            if (pending.idleTimeoutMs === undefined) continue;
+            clearTimeout(pending.timeout);
+            pending.timeout = setTimeout(() => {
+                this.pendingRequests.delete(this.findPendingId(pending) ?? -1);
+                pending.reject(new Error(
+                    `Hermes ACP stream went silent for ${Math.round(pending.idleTimeoutMs! / 1000)}s: ${pending.method}`,
+                ));
+            }, pending.idleTimeoutMs);
+        }
+    }
+
+    private findPendingId(target: PendingRequest): number | null {
+        for (const [id, p] of this.pendingRequests) {
+            if (p === target) return id;
+        }
+        return null;
     }
 
     private async initialize(): Promise<void> {
@@ -307,10 +346,11 @@ export class AcpClient extends EventEmitter {
     async prompt(text: string, sessionId?: string): Promise<{ stopReason: string; usage?: UsageInfo }> {
         const sid = sessionId ?? this.sessionId;
         if (!sid) throw new Error('No active session');
-        const result = await this.request<{ stopReason: string; usage?: UsageInfo }>('session/prompt', {
-            sessionId: sid,
-            prompt: [{ type: 'text', text }],
-        });
+        const result = await this.request<{ stopReason: string; usage?: UsageInfo }>(
+            'session/prompt',
+            { sessionId: sid, prompt: [{ type: 'text', text }] },
+            { idleTimeoutMs: this.streamIdleTimeoutMs },
+        );
         return result;
     }
 

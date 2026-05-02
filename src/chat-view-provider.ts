@@ -74,8 +74,13 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private getRequestTimeoutMs(): number {
-        const seconds = vscode.workspace.getConfiguration('hermes-chat').get('timeout', 180);
+        const seconds = vscode.workspace.getConfiguration('hermes-chat').get('timeout', 30);
         return Math.max(1, seconds) * 1000;
+    }
+
+    private getStreamIdleTimeoutMs(): number {
+        const seconds = vscode.workspace.getConfiguration('hermes-chat').get('streamIdleTimeout', 120);
+        return Math.max(5, seconds) * 1000;
     }
 
     private appendMessage(message: ChatMessage): void {
@@ -91,7 +96,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
 
         if (this.acp) this.acp.stop();
 
-        const client = new AcpClient(this.getHermesPath(), this.getRequestTimeoutMs());
+        const client = new AcpClient(this.getHermesPath(), this.getRequestTimeoutMs(), this.getStreamIdleTimeoutMs());
         client.on('sessionUpdate', (evt: SessionUpdate) => this.handleSessionUpdate(evt));
         client.on('exit', (code: number | null) => {
             this.postMessage({ type: 'showError', error: `Hermes ACP exited (code ${code}). Will restart on next message.` });
@@ -552,7 +557,24 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     async handleUserMessage(text: string) {
-        if (this.isProcessing || !text.trim()) return;
+        if (!text.trim()) return;
+
+        if (this.isProcessing) {
+            // Cursor-style auto-interrupt: cancel current prompt, wait for it to finish, then send new one.
+            try {
+                await this.acp?.cancel();
+            } catch {
+                // ignore cancel errors; the in-flight prompt will still reject and clear isProcessing
+            }
+            const start = Date.now();
+            while (this.isProcessing && Date.now() - start < 5000) {
+                await new Promise((r) => setTimeout(r, 50));
+            }
+            if (this.isProcessing) {
+                this.postMessage({ type: 'showError', error: 'Could not interrupt the current response in time. Please try again.' });
+                return;
+            }
+        }
 
         const query = this.buildQueryWithContext(text);
         const userMessage: ChatMessage = { role: 'user', content: text, timestamp: Date.now() };
@@ -1497,6 +1519,7 @@ let currentTextEl = null;
 let currentToolsEl = null;
 let toolEls = new Map();
 let shouldStickToBottom = true;
+let isProcessing = false;
 let workspaceTree = [];
 let attachedFilePaths = new Set();
 
@@ -1683,10 +1706,9 @@ function hydrateFromInitialState(data) {
         }
     }
     if (data.isProcessing) {
+        isProcessing = true;
         loadingEl.classList.add('visible');
-        sendBtn.style.display = 'none';
         cancelBtn.classList.add('visible');
-        inputEl.disabled = true;
     }
 }
 
@@ -1864,10 +1886,9 @@ window.addEventListener('message', (event) => {
             shouldStickToBottom = true;
             break;
         case 'setLoading':
+            isProcessing = !!msg.loading;
             loadingEl.classList.toggle('visible', msg.loading);
-            sendBtn.style.display = msg.loading ? 'none' : 'inline-block';
             cancelBtn.classList.toggle('visible', msg.loading);
-            inputEl.disabled = msg.loading;
             if (!msg.loading) {
                 inputEl.focus();
                 sendBtn.disabled = !inputEl.value.trim();

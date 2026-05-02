@@ -10,7 +10,7 @@ function getHermesPath(): string {
 }
 
 function getTimeoutMs(): number {
-    const seconds = vscode.workspace.getConfiguration('hermes-chat').get('timeout', 180);
+    const seconds = vscode.workspace.getConfiguration('hermes-chat').get('timeout', 30);
     return Math.max(1, seconds) * 1000;
 }
 

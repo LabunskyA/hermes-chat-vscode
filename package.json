@@ -2,7 +2,7 @@
   "name": "hermes-chat",
   "displayName": "Hermes Agent Chat",
   "description": "Streaming Hermes Agent chat with ACP, tool calls, memory, skills, models, cron jobs, and token usage",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "publisher": "Poppywu124",
   "license": "MIT",
   "repository": {
@@ -189,9 +189,15 @@
         },
         "hermes-chat.timeout": {
           "type": "number",
-          "default": 180,
+          "default": 30,
           "minimum": 1,
-          "description": "Maximum time in seconds to wait for Hermes ACP requests"
+          "description": "Timeout in seconds for short Hermes ACP control requests (initialize, new session, set model). Does not apply to chat prompts — see streamIdleTimeout."
+        },
+        "hermes-chat.streamIdleTimeout": {
+          "type": "number",
+          "default": 120,
+          "minimum": 5,
+          "description": "Maximum seconds to wait between streaming chunks during a chat prompt before considering it stalled. Total prompt duration is unbounded as long as Hermes keeps streaming."
         }
       }
     }
