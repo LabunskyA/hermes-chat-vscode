@@ -131,15 +131,49 @@ async function testProviderKey(provider: ProviderDef): Promise<TestResult> {
     }
 }
 
-function checkInstalled(): Promise<boolean> {
+function probeBinary(cmd: string): Promise<boolean> {
     return new Promise((resolve) => {
-        const proc = spawn(getHermesPath(), ['version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        const proc = spawn(cmd, ['version'], { stdio: ['ignore', 'pipe', 'pipe'] });
         let settled = false;
         const finish = (ok: boolean) => { if (settled) return; settled = true; clearTimeout(t); resolve(ok); };
         const t = setTimeout(() => { proc.kill(); finish(false); }, 5000);
         proc.on('close', (code) => finish(code === 0));
         proc.on('error', () => finish(false));
     });
+}
+
+// Common install locations that scripts use but that VSCode's GUI-launched
+// environment may not have on PATH (especially on macOS).
+function commonHermesPaths(): string[] {
+    const home = os.homedir();
+    return [
+        path.join(home, '.local', 'bin', 'hermes'),
+        path.join(home, '.cargo', 'bin', 'hermes'),
+        '/opt/homebrew/bin/hermes',
+        '/usr/local/bin/hermes',
+        path.join(home, 'bin', 'hermes'),
+    ];
+}
+
+async function checkInstalled(): Promise<boolean> {
+    if (await probeBinary(getHermesPath())) return true;
+
+    // Fallback: PATH may be missing the install dir (common when VSCode is
+    // launched from the dock instead of a shell). Probe known locations and,
+    // if one works, persist it as hermes-chat.hermesPath so future calls hit it.
+    for (const candidate of commonHermesPaths()) {
+        if (!fs.existsSync(candidate)) continue;
+        if (await probeBinary(candidate)) {
+            try {
+                await vscode.workspace.getConfiguration('hermes-chat')
+                    .update('hermesPath', candidate, vscode.ConfigurationTarget.Global);
+            } catch {
+                // settings update may fail in restricted hosts; the probe still succeeded
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 function upsertEnvVar(key: string, value: string): void {
@@ -202,6 +236,7 @@ export class SetupWizard {
                 case 'finish': await this.handleFinish(context); break;
                 case 'openWslDocs': await vscode.env.openExternal(vscode.Uri.parse('https://learn.microsoft.com/windows/wsl/install')); break;
                 case 'openTermuxDocs': await vscode.env.openExternal(vscode.Uri.parse('https://hermes-agent.nousresearch.com/docs/getting-started/termux')); break;
+                case 'reload': await vscode.commands.executeCommand('workbench.action.reloadWindow'); break;
             }
         });
         this.panel.onDidDispose(() => {
@@ -470,7 +505,7 @@ window.addEventListener('message', (event) => {
       }
       renderProviders();
       break;
-    case 'notInstalled': statusInstall.textContent = 'Hermes not found yet. If you just installed, restart your shell or run "source ~/.zshrc".'; statusInstall.className = 'status err'; break;
+    case 'notInstalled': statusInstall.innerHTML = 'Hermes still not on PATH. Common cause: VS Code was launched from the dock and never inherited your shell PATH. <a href="#" id="link-reload">Reload window</a> after restarting VS Code from a terminal (e.g. <code>code .</code>), or set <code>hermes-chat.hermesPath</code> to the full binary path.'; statusInstall.className = 'status err'; document.getElementById('link-reload').onclick = (e) => { e.preventDefault(); vscode.postMessage({ type: 'reload' }); }; break;
     case 'showWindowsHelp': winHelp.classList.add('show'); statusInstall.textContent = 'Windows requires WSL2.'; statusInstall.className = 'status err'; break;
     case 'providerCancelled': statusProvider.textContent = 'Cancelled. Pick a provider when you\\'re ready.'; statusProvider.className = 'status'; break;
     case 'providerError': statusProvider.textContent = 'Failed to save: ' + m.error; statusProvider.className = 'status err'; break;
