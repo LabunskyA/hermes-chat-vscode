@@ -335,7 +335,15 @@ export class AcpClient extends EventEmitter {
 
     async resumeSession(sessionId: string, cwd: string): Promise<boolean> {
         try {
-            await this.request('session/resume', { sessionId, cwd, mcpServers: [] });
+            const result = await this.request<{ sessionId?: string }>(
+                'session/resume',
+                { sessionId, cwd, mcpServers: [] },
+            );
+            // Hermes silently creates a fresh session when the requested id is unknown
+            // and omits sessionId from the response. Treat that as a failed resume so the
+            // caller starts a clean session/new instead of prompting against a stale id.
+            const returned = result?.sessionId;
+            if (!returned || returned !== sessionId) return false;
             this.sessionId = sessionId;
             return true;
         } catch {
