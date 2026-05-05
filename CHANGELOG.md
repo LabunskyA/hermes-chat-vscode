@@ -1,5 +1,13 @@
 # Changelog
 
+# Changelog
+
+## 0.4.6 (2026-05-05)
+
+- Fix blank assistant reply after VS Code reload: validate the resumed sessionId returned by Hermes and fall back to a fresh session when the previous one is gone.
+- Setup wizard: probe `~/.local/bin/hermes` and other common install locations when the binary is not on PATH (typical when VS Code is launched from the dock); persist the working absolute path to `hermes-chat.hermesPath`.
+- Setup wizard: clearer guidance and a one-click reload-window action when Hermes still cannot be located after install.
+
 ## 0.3.0 (2026-04-26)
 
 - Improve Marketplace positioning with clearer AI agent description, search keywords, and README feature matrix.
