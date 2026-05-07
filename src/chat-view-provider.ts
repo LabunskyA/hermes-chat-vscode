@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AcpClient, SessionUpdate } from './acp-client';
+import { checkInstalled, readConfigState } from './setup-wizard';
 import { ChatMessage, ToolCallInfo, UsageInfo } from './types';
 import { UsageStore } from './usage-store';
 
@@ -465,6 +466,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
             messages: this.messages,
             currentAssistantMessage: this.currentAssistantMessage,
             workspaceTree: [],
+            setupCompleted: this.context.globalState.get<boolean>('hermes-chat.setupCompleted', false),
             ...this.getViewStatePayload(),
         };
     }
@@ -513,12 +515,47 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
                 case 'clearAttachments':
                     this.clearAttachedFiles();
                     break;
+                case 'runSetup':
+                    void vscode.commands.executeCommand('hermes-chat.runSetup');
+                    break;
+                case 'copyInstallCmd':
+                    void vscode.env.clipboard.writeText('curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash');
+                    this.postMessage({ type: 'installStatus', ok: false, text: 'Copied to clipboard. Paste into your terminal and run.' });
+                    break;
+                case 'checkInstall':
+                    void checkInstalled().then((ok) => {
+                        this.postMessage({ type: 'installStatus', ok, text: ok ? 'Hermes CLI detected.' : 'Hermes not found. Install it first.' });
+                    });
+                    break;
+                case 'openHermesSetup': {
+                    const term = vscode.window.createTerminal({ name: 'Hermes Setup' });
+                    term.show();
+                    term.sendText('hermes setup');
+                    break;
+                }
+                case 'checkProvider': {
+                    const installed = await checkInstalled();
+                    if (!installed) {
+                        this.postMessage({ type: 'providerStatus', ok: false, text: 'Install Hermes CLI first.' });
+                        break;
+                    }
+                    const cfg = readConfigState();
+                    if (cfg.providerConfigured) {
+                        this.postMessage({ type: 'providerStatus', ok: true, text: `Configured: ${cfg.activeProvider}` });
+                        await this.context.globalState.update('hermes-chat.setupCompleted', true);
+                        void vscode.commands.executeCommand('setContext', 'hermes-chat.setupCompleted', true);
+                    } else {
+                        this.postMessage({ type: 'providerStatus', ok: false, text: 'No provider configured yet. Run hermes setup.' });
+                    }
+                    break;
+                }
             }
         });
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
         this.sidebarView = webviewView;
+        webviewView.webview.options = { enableScripts: true };
         webviewView.webview.html = this.getHtml('sidebar');
 
         const messageSub = this.wireWebview(webviewView.webview);
@@ -529,6 +566,12 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
 
         this.syncViewState();
         void this.refreshWorkspaceTree();
+
+        if (!this.context.globalState.get<boolean>('hermes-chat.setupCompleted', false)) {
+            void checkInstalled().then((ok) => {
+                if (ok) this.postMessage({ type: 'installStatus', ok: true, text: 'Hermes CLI detected.' });
+            });
+        }
     }
 
     openPanel(): void {
@@ -1194,6 +1237,29 @@ html[data-mode="panel"] .message.user .message-bubble {
 
 #welcome h2 { margin-bottom: 6px; color: var(--vscode-foreground); font-size: 15px; }
 #welcome p { line-height: 1.5; }
+.setup-step {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid var(--vscode-panel-border, #333);
+    border-radius: 6px;
+    transition: opacity 0.2s;
+}
+.setup-step.done { opacity: 0.5; }
+.setup-step-title { font-weight: 600; font-size: 13px; color: var(--vscode-foreground); margin-bottom: 6px; }
+.setup-step p { margin: 4px 0 8px; font-size: 12px; }
+.setup-step pre {
+    background: var(--vscode-textCodeBlock-background);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-bottom: 8px;
+}
+.setup-status { margin-top: 8px; font-size: 12px; min-height: 16px; }
+.setup-status.ok { color: var(--vscode-testing-iconPassed); }
+.setup-status.err { color: var(--vscode-errorForeground); }
 #welcome-actions {
     display: flex;
     gap: 8px;
@@ -1458,8 +1524,32 @@ html[data-mode="panel"] #composer {
 
         <div id="messages">
             <div id="welcome">
-                <h2>Start a Hermes session</h2>
-                <p>Ask about the active file, selected code, or anything in your local Hermes setup. Tool calls and token usage stream in place.</p>
+                <div id="welcome-setup">
+                    <h2>Welcome to Hermes</h2>
+                    <p style="margin:6px 0 14px;color:var(--vscode-descriptionForeground);">Two quick steps to get started:</p>
+
+                    <div class="setup-step" id="setup-step-install">
+                        <div class="setup-step-title">1. Install Hermes CLI</div>
+                        <p>Run this in your terminal:</p>
+                        <pre id="install-cmd">curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash</pre>
+                        <button class="toolbar-btn" type="button" id="btn-copy-install">Copy command</button>
+                        <button class="toolbar-btn" type="button" id="btn-check-install">Already installed</button>
+                        <div id="install-status" class="setup-status"></div>
+                    </div>
+
+                    <div class="setup-step" id="setup-step-provider" style="opacity:0.5;pointer-events:none;">
+                        <div class="setup-step-title">2. Configure a provider</div>
+                        <p>Run in your terminal:</p>
+                        <pre>hermes setup</pre>
+                        <button class="toolbar-btn" type="button" id="btn-run-hermes-setup">Open terminal</button>
+                        <button class="toolbar-btn" type="button" id="btn-check-provider">I've configured</button>
+                        <div id="provider-status" class="setup-status"></div>
+                    </div>
+                </div>
+                <div id="welcome-ready" style="display:none;">
+                    <h2>Start a Hermes session</h2>
+                    <p>Ask about the active file, selected code, or anything in your local Hermes setup. Tool calls and token usage stream in place.</p>
+                </div>
             </div>
         </div>
 
@@ -1691,6 +1781,19 @@ function renderAttachments(files) {
 }
 
 function hydrateFromInitialState(data) {
+    const setupEl = document.getElementById('welcome-setup');
+    const readyEl = document.getElementById('welcome-ready');
+    const inputArea = document.getElementById('input-area');
+    if (setupEl && readyEl) {
+        if (data.setupCompleted) {
+            setupEl.style.display = 'none';
+            readyEl.style.display = 'block';
+        } else {
+            setupEl.style.display = 'block';
+            readyEl.style.display = 'none';
+            if (inputArea) inputArea.style.display = 'none';
+        }
+    }
     syncSessionState(data);
     renderWorkspaceTree(data.workspaceTree || []);
     if (Array.isArray(data.messages)) {
@@ -1846,6 +1949,10 @@ inputEl.addEventListener('input', () => {
 sendBtn.addEventListener('click', sendMessage);
 cancelBtn.addEventListener('click', () => vscode.postMessage({ type: 'cancel' }));
 openPanelBtn?.addEventListener('click', () => vscode.postMessage({ type: 'openPanel' }));
+document.getElementById('btn-copy-install')?.addEventListener('click', () => vscode.postMessage({ type: 'copyInstallCmd' }));
+document.getElementById('btn-check-install')?.addEventListener('click', () => vscode.postMessage({ type: 'checkInstall' }));
+document.getElementById('btn-run-hermes-setup')?.addEventListener('click', () => vscode.postMessage({ type: 'openHermesSetup' }));
+document.getElementById('btn-check-provider')?.addEventListener('click', () => vscode.postMessage({ type: 'checkProvider' }));
 attachFilesBtn?.addEventListener('click', () => {
     workspaceBrowserEl.classList.toggle('visible');
 });
@@ -1902,6 +2009,30 @@ window.addEventListener('message', (event) => {
             messagesEl.appendChild(errDiv);
             maybeAutoScroll();
             break;
+        case 'installStatus': {
+            const el = document.getElementById('install-status');
+            if (el) { el.textContent = msg.text; el.className = 'setup-status ' + (msg.ok ? 'ok' : 'err'); }
+            if (msg.ok) {
+                const step = document.getElementById('setup-step-install');
+                const step2 = document.getElementById('setup-step-provider');
+                if (step) step.classList.add('done');
+                if (step2) { step2.style.opacity = '1'; step2.style.pointerEvents = 'auto'; }
+            }
+            break;
+        }
+        case 'providerStatus': {
+            const el = document.getElementById('provider-status');
+            if (el) { el.textContent = msg.text; el.className = 'setup-status ' + (msg.ok ? 'ok' : 'err'); }
+            if (msg.ok) {
+                const setupEl = document.getElementById('welcome-setup');
+                const readyEl = document.getElementById('welcome-ready');
+                const inputArea = document.getElementById('input-area');
+                if (setupEl) setupEl.style.display = 'none';
+                if (readyEl) readyEl.style.display = 'block';
+                if (inputArea) inputArea.style.display = '';
+            }
+            break;
+        }
     }
 });
 </script>

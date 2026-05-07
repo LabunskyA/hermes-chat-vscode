@@ -61,7 +61,7 @@ interface ConfigState {
     activeModel: string | null;
 }
 
-function readConfigState(): ConfigState {
+export function readConfigState(): ConfigState {
     try {
         if (!fs.existsSync(configPath())) return { providerConfigured: false, activeProvider: null, activeModel: null };
         const raw = fs.readFileSync(configPath(), 'utf8');
@@ -155,7 +155,7 @@ function commonHermesPaths(): string[] {
     ];
 }
 
-async function checkInstalled(): Promise<boolean> {
+export async function checkInstalled(): Promise<boolean> {
     if (await probeBinary(getHermesPath())) return true;
 
     // Fallback: PATH may be missing the install dir (common when VSCode is
@@ -250,9 +250,8 @@ export class SetupWizard {
         const installed = await checkInstalled();
         if (installed && readConfigState().providerConfigured) {
             await context.globalState.update('hermes-chat.setupCompleted', true);
-            return;
+            void vscode.commands.executeCommand('setContext', 'hermes-chat.setupCompleted', true);
         }
-        await this.show(context);
     }
 
     private static post(msg: unknown): void { this.panel?.webview.postMessage(msg); }
@@ -339,6 +338,7 @@ export class SetupWizard {
 
     private static async handleFinish(context: vscode.ExtensionContext): Promise<void> {
         await context.globalState.update('hermes-chat.setupCompleted', true);
+        void vscode.commands.executeCommand('setContext', 'hermes-chat.setupCompleted', true);
         this.panel?.dispose();
         await vscode.commands.executeCommand('hermes-chat.chatView.focus');
     }

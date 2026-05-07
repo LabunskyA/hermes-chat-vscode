@@ -2,7 +2,7 @@
   "name": "hermes-chat",
   "displayName": "Hermes Agent Chat",
   "description": "Streaming Hermes Agent chat with ACP, tool calls, memory, skills, models, cron jobs, and token usage",
-  "version": "0.4.7",
+  "version": "0.5.0",
   "publisher": "Poppywu124",
   "license": "MIT",
   "repository": {
@@ -63,27 +63,32 @@
         {
           "id": "hermes-chat.memoryView",
           "name": "Memory",
-          "visibility": "collapsed"
+          "visibility": "collapsed",
+          "when": "hermes-chat.setupCompleted"
         },
         {
           "id": "hermes-chat.skillsView",
           "name": "Skills",
-          "visibility": "collapsed"
+          "visibility": "collapsed",
+          "when": "hermes-chat.setupCompleted"
         },
         {
           "id": "hermes-chat.cronView",
           "name": "Cron Jobs",
-          "visibility": "collapsed"
+          "visibility": "collapsed",
+          "when": "hermes-chat.setupCompleted"
         },
         {
           "id": "hermes-chat.modelView",
           "name": "Model",
-          "visibility": "collapsed"
+          "visibility": "collapsed",
+          "when": "hermes-chat.setupCompleted"
         },
         {
           "id": "hermes-chat.usageView",
           "name": "Token Usage",
-          "visibility": "collapsed"
+          "visibility": "collapsed",
+          "when": "hermes-chat.setupCompleted"
         }
       ]
     },

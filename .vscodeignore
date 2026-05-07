@@ -5,6 +5,7 @@ test/**
 .github/**
 .gitignore
 tsconfig.json
-node_modules/**
+node_modules/@types/**
+node_modules/.package-lock.json
 *.map
 *.vsix
