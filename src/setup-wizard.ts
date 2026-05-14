@@ -246,12 +246,19 @@ export class SetupWizard {
     }
 
     static async maybeShowOnActivate(context: vscode.ExtensionContext): Promise<void> {
-        if (context.globalState.get<boolean>('hermes-chat.setupCompleted', false)) return;
         const installed = await checkInstalled();
-        if (installed && readConfigState().providerConfigured) {
+        const cfg = installed ? readConfigState() : { providerConfigured: false, activeProvider: null, activeModel: null };
+        const isReady = installed && cfg.providerConfigured;
+
+        if (isReady) {
             await context.globalState.update('hermes-chat.setupCompleted', true);
             void vscode.commands.executeCommand('setContext', 'hermes-chat.setupCompleted', true);
+            return;
         }
+
+        await context.globalState.update('hermes-chat.setupCompleted', false);
+        void vscode.commands.executeCommand('setContext', 'hermes-chat.setupCompleted', false);
+        await this.show(context);
     }
 
     private static post(msg: unknown): void { this.panel?.webview.postMessage(msg); }

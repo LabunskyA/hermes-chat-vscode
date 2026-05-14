@@ -230,8 +230,6 @@ export async function activate(context: vscode.ExtensionContext) {
     const setupDone = context.globalState.get<boolean>('hermes-chat.setupCompleted', false);
     void vscode.commands.executeCommand('setContext', 'hermes-chat.setupCompleted', setupDone);
 
-    void SetupWizard.maybeShowOnActivate(context);
-
     context.subscriptions.push({ dispose: () => chatProvider.dispose() });
 }
 

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AcpClient, SessionUpdate } from './acp-client';
-import { checkInstalled, readConfigState } from './setup-wizard';
+import { checkInstalled, readConfigState, SetupWizard } from './setup-wizard';
 import { ChatMessage, ToolCallInfo, UsageInfo } from './types';
 import { UsageStore } from './usage-store';
 
@@ -1526,25 +1526,10 @@ html[data-mode="panel"] #composer {
             <div id="welcome">
                 <div id="welcome-setup">
                     <h2>Welcome to Hermes</h2>
-                    <p style="margin:6px 0 14px;color:var(--vscode-descriptionForeground);">Two quick steps to get started:</p>
-
-                    <div class="setup-step" id="setup-step-install">
-                        <div class="setup-step-title">1. Install Hermes CLI</div>
-                        <p>Run this in your terminal:</p>
-                        <pre id="install-cmd">curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash</pre>
-                        <button class="toolbar-btn" type="button" id="btn-copy-install">Copy command</button>
-                        <button class="toolbar-btn" type="button" id="btn-check-install">Already installed</button>
-                        <div id="install-status" class="setup-status"></div>
-                    </div>
-
-                    <div class="setup-step" id="setup-step-provider" style="opacity:0.5;pointer-events:none;">
-                        <div class="setup-step-title">2. Configure a provider</div>
-                        <p>Run in your terminal:</p>
-                        <pre>hermes setup</pre>
-                        <button class="toolbar-btn" type="button" id="btn-run-hermes-setup">Open terminal</button>
-                        <button class="toolbar-btn" type="button" id="btn-check-provider">I've configured</button>
-                        <div id="provider-status" class="setup-status"></div>
-                    </div>
+                    <p style="margin:6px 0 14px;color:var(--vscode-descriptionForeground);">Hermes isn't set up yet. The setup wizard should be open in the editor area — finish it to start chatting.</p>
+                    <button class="toolbar-btn" type="button" id="btn-open-wizard">Open setup wizard</button>
+                    <div id="install-status" class="setup-status" style="display:none;"></div>
+                    <div id="provider-status" class="setup-status" style="display:none;"></div>
                 </div>
                 <div id="welcome-ready" style="display:none;">
                     <h2>Start a Hermes session</h2>
@@ -1953,6 +1938,7 @@ document.getElementById('btn-copy-install')?.addEventListener('click', () => vsc
 document.getElementById('btn-check-install')?.addEventListener('click', () => vscode.postMessage({ type: 'checkInstall' }));
 document.getElementById('btn-run-hermes-setup')?.addEventListener('click', () => vscode.postMessage({ type: 'openHermesSetup' }));
 document.getElementById('btn-check-provider')?.addEventListener('click', () => vscode.postMessage({ type: 'checkProvider' }));
+document.getElementById('btn-open-wizard')?.addEventListener('click', () => vscode.postMessage({ type: 'runSetup' }));
 attachFilesBtn?.addEventListener('click', () => {
     workspaceBrowserEl.classList.toggle('visible');
 });
