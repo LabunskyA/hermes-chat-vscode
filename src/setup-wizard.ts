@@ -7,8 +7,12 @@ import * as yaml from 'js-yaml';
 
 const INSTALL_CMD = 'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash';
 
+// Referral link — users who register through this link are bound as subordinate
+// customers, so their platform consumption is credited back per the distribution ratio.
+export const REFERRAL_URL = 'https://share.acedata.cloud/r/1uN9UXvGv7';
+
 interface ProviderDef {
-    id: string;             // hermes provider id (model.provider value)
+    id: string;             // card id
     label: string;
     envKey: string | null;  // env var to write to ~/.hermes/.env (null = no key)
     defaultModel: string;
@@ -17,9 +21,13 @@ interface ProviderDef {
     tier: 1 | 2;            // 1 = top-level grid, 2 = "more" dropdown
     testUrl?: string;       // if set, GET this with auth to validate the key
     testAuth?: 'bearer' | 'x-api-key' | 'anthropic' | 'query'; // how to attach the key
+    hermesProvider?: string; // actual model.provider value if different from id
+    baseUrl?: string;        // OpenAI-compatible base URL (sets model.base_url + api_mode)
 }
 
 const PROVIDERS: ProviderDef[] = [
+    // Featured — Ace Data Cloud: one key, 50+ models (OpenAI-compatible gateway)
+    { id: 'acedata', label: 'Ace Data Cloud — 50+ models, one key', envKey: 'ACEDATA_API_KEY', defaultModel: 'gpt-4o-mini', keyHelp: 'AceData API key', keyUrl: REFERRAL_URL, tier: 1, hermesProvider: 'custom', baseUrl: 'https://api.acedata.cloud/v1', testUrl: 'https://api.acedata.cloud/v1/models', testAuth: 'bearer' },
     // Tier 1 — main grid
     { id: 'anthropic',   label: 'Anthropic',                            envKey: 'ANTHROPIC_API_KEY',    defaultModel: '',     keyHelp: 'sk-ant-…',  keyUrl: 'https://console.anthropic.com/settings/keys', tier: 1, testUrl: 'https://api.anthropic.com/v1/models', testAuth: 'anthropic' },
     { id: 'openrouter',  label: 'OpenRouter',                           envKey: 'OPENROUTER_API_KEY',   defaultModel: '',     keyHelp: 'sk-or-…',   keyUrl: 'https://openrouter.ai/keys', tier: 1, testUrl: 'https://openrouter.ai/api/v1/models', testAuth: 'bearer' },
@@ -59,22 +67,35 @@ interface ConfigState {
     providerConfigured: boolean;
     activeProvider: string | null;
     activeModel: string | null;
+    baseUrl: string | null;
+}
+
+// Map a stored config back to the wizard card id. A card may use a different
+// Hermes provider (e.g. acedata -> custom), so match on base_url when present.
+function cardIdForConfig(cfg: ConfigState): string | null {
+    if (!cfg.activeProvider) return null;
+    if (cfg.baseUrl) {
+        const byUrl = PROVIDERS.find((p) => p.baseUrl && p.baseUrl === cfg.baseUrl);
+        if (byUrl) return byUrl.id;
+    }
+    return cfg.activeProvider;
 }
 
 export function readConfigState(): ConfigState {
     try {
-        if (!fs.existsSync(configPath())) return { providerConfigured: false, activeProvider: null, activeModel: null };
+        if (!fs.existsSync(configPath())) return { providerConfigured: false, activeProvider: null, activeModel: null, baseUrl: null };
         const raw = fs.readFileSync(configPath(), 'utf8');
         const doc = yaml.load(raw) as Record<string, unknown> | null;
         const model = (doc?.model ?? {}) as Record<string, unknown>;
         const provider = typeof model.provider === 'string' ? model.provider : null;
         const def = typeof model.default === 'string' ? model.default : (typeof model.model === 'string' ? model.model : null);
+        const baseUrl = typeof model.base_url === 'string' ? model.base_url : null;
         // "auto" with no env keys = not really configured
         const envOk = hasAnyKnownKey();
         const configured = !!provider && provider !== 'auto' && (provider === 'custom' || envOk);
-        return { providerConfigured: configured, activeProvider: provider, activeModel: def };
+        return { providerConfigured: configured, activeProvider: provider, activeModel: def, baseUrl };
     } catch {
-        return { providerConfigured: false, activeProvider: null, activeModel: null };
+        return { providerConfigured: false, activeProvider: null, activeModel: null, baseUrl: null };
     }
 }
 
@@ -186,17 +207,23 @@ function upsertEnvVar(key: string, value: string): void {
     fs.writeFileSync(envPath(), raw, { mode: 0o600 });
 }
 
-function writeProviderToConfig(providerId: string, model: string): void {
+function writeProviderToConfig(def: ProviderDef, model: string, key?: string): void {
     let doc: Record<string, unknown> = {};
     if (fs.existsSync(configPath())) {
         try {
             doc = (yaml.load(fs.readFileSync(configPath(), 'utf8')) as Record<string, unknown>) || {};
         } catch { doc = {}; }
     }
+    const providerId = def.hermesProvider ?? def.id;
     const m = (doc.model ?? {}) as Record<string, unknown>;
     m.provider = providerId;
     if (model) m.default = model; else delete m.default;
-    if (providerId !== 'custom' && providerId !== 'lmstudio') {
+    if (def.baseUrl) {
+        // OpenAI-compatible gateway (e.g. Ace Data Cloud)
+        m.base_url = def.baseUrl;
+        m.api_mode = 'openai';
+        if (key) m.api_key = key;
+    } else if (providerId !== 'custom' && providerId !== 'lmstudio') {
         delete m.base_url;
         delete m.api_mode;
         delete m.api_key;
@@ -215,7 +242,7 @@ export class SetupWizard {
         if (this.panel) { this.panel.reveal(vscode.ViewColumn.Active); return; }
 
         const installed = await checkInstalled();
-        const cfg = installed ? readConfigState() : { providerConfigured: false, activeProvider: null, activeModel: null };
+        const cfg: ConfigState = installed ? readConfigState() : { providerConfigured: false, activeProvider: null, activeModel: null, baseUrl: null };
 
         this.panel = vscode.window.createWebviewPanel(
             'hermes-chat.setup',
@@ -236,6 +263,7 @@ export class SetupWizard {
                 case 'finish': await this.handleFinish(context); break;
                 case 'openWslDocs': await vscode.env.openExternal(vscode.Uri.parse('https://learn.microsoft.com/windows/wsl/install')); break;
                 case 'openTermuxDocs': await vscode.env.openExternal(vscode.Uri.parse('https://hermes-agent.nousresearch.com/docs/getting-started/termux')); break;
+                case 'openReferral': await vscode.env.openExternal(vscode.Uri.parse(REFERRAL_URL)); break;
                 case 'reload': await vscode.commands.executeCommand('workbench.action.reloadWindow'); break;
             }
         });
@@ -293,7 +321,26 @@ export class SetupWizard {
         const def = PROVIDERS.find((p) => p.id === providerId);
         if (!def) return;
 
+        let savedKey: string | undefined;
         if (def.envKey) {
+            // For providers with a sign-up page, offer to open it first — most new
+            // users don't have a key yet and need to create an account.
+            if (def.keyUrl) {
+                const signUpLabel = def.id === 'acedata' ? 'Sign up / get key' : 'Get a key';
+                const choice = await vscode.window.showInformationMessage(
+                    `Do you already have a ${def.label} API key?`,
+                    { modal: true, detail: def.id === 'acedata'
+                        ? 'Ace Data Cloud gives one key for 50+ models. Sign-up is free with trial credits. Open the sign-up page to create an account and copy your key, then paste it here.'
+                        : 'If you don\u2019t have a key yet, open the provider page to create one, then paste it here.' },
+                    'I have a key', signUpLabel,
+                );
+                if (choice === undefined) { this.post({ type: 'providerCancelled' }); return; }
+                if (choice === signUpLabel) {
+                    await vscode.env.openExternal(vscode.Uri.parse(def.keyUrl));
+                    // fall through to the input box so they can paste once they're back
+                }
+            }
+
             const key = await vscode.window.showInputBox({
                 prompt: `Paste your ${def.label} API key`,
                 placeHolder: def.keyHelp,
@@ -304,27 +351,30 @@ export class SetupWizard {
             if (!key) {
                 if (def.keyUrl) {
                     const choice = await vscode.window.showInformationMessage(
-                        `Need a ${def.label} key?`, 'Get one', 'Cancel',
+                        `Need a ${def.label} key?`, 'Open sign-up page', 'Cancel',
                     );
-                    if (choice === 'Get one') await vscode.env.openExternal(vscode.Uri.parse(def.keyUrl));
+                    if (choice === 'Open sign-up page') await vscode.env.openExternal(vscode.Uri.parse(def.keyUrl));
                 }
                 this.post({ type: 'providerCancelled' });
                 return;
             }
-            try { upsertEnvVar(def.envKey, key.trim()); }
+            savedKey = key.trim();
+            try { upsertEnvVar(def.envKey, savedKey); }
             catch (err) {
                 this.post({ type: 'providerError', error: err instanceof Error ? err.message : String(err) });
                 return;
             }
         }
 
-        try { writeProviderToConfig(def.id, def.defaultModel); }
+        try { writeProviderToConfig(def, def.defaultModel, savedKey); }
         catch (err) {
             this.post({ type: 'providerError', error: err instanceof Error ? err.message : String(err) });
             return;
         }
 
-        this.post({ type: 'providerSaved', cfg: readConfigState() });
+        // Report back using the card id + label so the UI highlights the right
+        // card even when it maps to a different Hermes provider (e.g. acedata -> custom).
+        this.post({ type: 'providerSaved', cfg: readConfigState(), cardId: def.id, cardLabel: def.label });
     }
 
     private static async handleAdvanced(): Promise<void> {
@@ -335,9 +385,10 @@ export class SetupWizard {
 
     private static async handleTestKey(): Promise<void> {
         const cfg = readConfigState();
-        if (!cfg.activeProvider) { this.post({ type: 'testResult', ok: false, message: 'No provider configured yet. Pick one above first.' }); return; }
-        const def = PROVIDERS.find((p) => p.id === cfg.activeProvider);
-        if (!def) { this.post({ type: 'testResult', ok: false, message: `Unknown provider: ${cfg.activeProvider}. Hermes will still try to use it.` }); return; }
+        const cardId = cardIdForConfig(cfg);
+        if (!cardId) { this.post({ type: 'testResult', ok: false, message: 'No provider configured yet. Pick one above first.' }); return; }
+        const def = PROVIDERS.find((p) => p.id === cardId);
+        if (!def) { this.post({ type: 'testResult', ok: false, message: `Unknown provider: ${cardId}. Hermes will still try to use it.` }); return; }
         this.post({ type: 'testStarted' });
         const result = await testProviderKey(def);
         this.post({ type: 'testResult', ...result });
@@ -353,6 +404,11 @@ export class SetupWizard {
     private static html(installed: boolean, cfg: ConfigState): string {
         const isWindows = process.platform === 'win32';
         const providersJson = JSON.stringify(PROVIDERS);
+        const initialCardId = cardIdForConfig(cfg);
+        const initialLabel = (PROVIDERS.find((p) => p.id === initialCardId)?.label) || cfg.activeProvider || '';
+        const initialStatus = cfg.providerConfigured
+            ? `\u2713 ${initialLabel} is ready${cfg.activeModel ? ' (model: ' + cfg.activeModel + ')' : ''}`
+            : '';
         return /* html */ `<!doctype html>
 <html><head><meta charset="utf-8" /><style>
 body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 32px 40px; max-width: 760px; margin: 0 auto; line-height: 1.55; }
@@ -383,6 +439,9 @@ pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; bo
 .provider-card .name { font-weight: 600; margin-bottom: 2px; }
 .provider-card .hint { font-size: 11px; color: var(--vscode-descriptionForeground); }
 .provider-card.active-provider { border-color: var(--vscode-testing-iconPassed); }
+.referral { border: 1px solid var(--vscode-focusBorder); border-radius: 6px; padding: 12px 14px; margin: 4px 0 14px; background: var(--vscode-textBlockQuote-background); font-size: 12px; }
+.referral b { font-size: 13px; }
+.referral a { color: var(--vscode-textLink-foreground); cursor: pointer; }
 </style></head><body>
 <h1>Welcome to Hermes Agent Chat</h1>
 <div class="sub">A couple of quick steps and you'll be chatting with Hermes inside VS Code.</div>
@@ -404,6 +463,10 @@ pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; bo
 <div class="step ${cfg.providerConfigured ? 'done' : (installed ? 'active' : '')}" id="step-provider">
   <h2><span class="badge">2</span> Pick a model provider</h2>
   <p>Choose where Hermes should send requests. Your API key is stored locally in <code>~/.hermes/.env</code>.</p>
+  <div class="referral">
+    <b>No API key yet?</b> <b>Ace Data Cloud</b> gives one key for 50+ models (GPT, Claude, Gemini, …). Free to sign up with trial credits, then pay-as-you-go — no subscription.
+    <a id="link-referral">Create a free account →</a>
+  </div>
   <div class="providers" id="providers"></div>
   <details style="margin-top:14px"><summary>More providers (Kimi, GLM, MiniMax, NVIDIA, …)</summary>
     <div style="display:flex; gap:8px; align-items:center; margin-top:10px">
@@ -413,7 +476,7 @@ pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; bo
       <button id="btn-more-pick">Use this provider</button>
     </div>
   </details>
-  <div class="status${cfg.providerConfigured ? ' ok' : ''}" id="status-provider">${cfg.providerConfigured ? `Configured: ${cfg.activeProvider}${cfg.activeModel ? ' → ' + cfg.activeModel : ' (model: auto)'}` : ''}</div>
+  <div class="status${cfg.providerConfigured ? ' ok' : ''}" id="status-provider">${initialStatus}</div>
   <div style="margin-top:6px"><button id="btn-test" class="secondary" ${cfg.providerConfigured ? '' : 'disabled'}>Test connection</button></div>
   <details style="margin-top:8px"><summary>Advanced (multi-provider, custom endpoints, tools)</summary>
     <p style="margin-top:8px">For full configuration (multiple providers at once, MCP servers, tool toggles), run Hermes's own setup wizard in a terminal:</p>
@@ -433,7 +496,7 @@ const PROVIDERS = ${providersJson};
 const isWindows = ${isWindows};
 let installed = ${installed};
 let providerConfigured = ${cfg.providerConfigured};
-let activeProviderId = ${JSON.stringify(cfg.activeProvider)};
+let activeProviderId = ${JSON.stringify(initialCardId)};
 
 const stepInstall = document.getElementById('step-install');
 const stepProvider = document.getElementById('step-provider');
@@ -457,7 +520,8 @@ function renderProviders() {
     const btn = document.createElement('button');
     btn.className = 'provider-card' + (activeProviderId === p.id ? ' active-provider' : '');
     btn.disabled = !installed;
-    btn.innerHTML = '<div class="name">' + p.label + '</div><div class="hint">' + (p.envKey ? 'Needs API key' : (p.id === 'nous' ? 'OAuth (hermes auth)' : p.id === 'custom' ? 'OpenAI-compatible endpoint' : 'No key')) + '</div>';
+    const hint = p.id === 'acedata' ? 'Recommended · 50+ models · free signup' : (p.envKey ? 'Needs API key' : (p.id === 'nous' ? 'OAuth (hermes auth)' : p.id === 'custom' ? 'OpenAI-compatible endpoint' : 'No key'));
+    btn.innerHTML = '<div class="name">' + p.label + '</div><div class="hint">' + hint + '</div>';
     btn.onclick = () => vscode.postMessage({ type: 'pickProvider', providerId: p.id });
     providersEl.appendChild(btn);
   }
@@ -487,9 +551,23 @@ document.getElementById('btn-more-pick').onclick = () => {
 btnFinish.onclick = () => vscode.postMessage({ type: 'finish' });
 document.getElementById('link-wsl').onclick = (e) => { e.preventDefault(); vscode.postMessage({ type: 'openWslDocs' }); };
 document.getElementById('link-termux').onclick = (e) => { e.preventDefault(); vscode.postMessage({ type: 'openTermuxDocs' }); };
+document.getElementById('link-referral').onclick = (e) => { e.preventDefault(); vscode.postMessage({ type: 'openReferral' }); };
 
 if (isWindows) winHelp.classList.add('show');
 if (providerConfigured) setActive('finish'); else if (installed) setActive('provider'); else setActive('install');
+
+function cardIdFor(cfg) {
+  if (!cfg || !cfg.activeProvider) return null;
+  if (cfg.baseUrl) {
+    const byUrl = PROVIDERS.find((p) => p.baseUrl && p.baseUrl === cfg.baseUrl);
+    if (byUrl) return byUrl.id;
+  }
+  return cfg.activeProvider;
+}
+function labelFor(id, fallback) {
+  const p = PROVIDERS.find((x) => x.id === id);
+  return (p && p.name ? p.name : (p ? p.label : null)) || fallback || id;
+}
 
 window.addEventListener('message', (event) => {
   const m = event.data;
@@ -501,9 +579,10 @@ window.addEventListener('message', (event) => {
       stepInstall.classList.add('done');
       statusInstall.textContent = 'Hermes detected.'; statusInstall.className = 'status ok';
       if (m.cfg && m.cfg.providerConfigured) {
-        providerConfigured = true; activeProviderId = m.cfg.activeProvider;
+        const cid = cardIdFor(m.cfg);
+        providerConfigured = true; activeProviderId = cid;
         stepProvider.classList.add('done');
-        statusProvider.textContent = 'Configured: ' + m.cfg.activeProvider + (m.cfg.activeModel ? ' → ' + m.cfg.activeModel : ' (model: auto — switch later in the Model panel)');
+        statusProvider.textContent = '✓ ' + labelFor(cid, m.cfg.activeProvider) + ' is ready' + (m.cfg.activeModel ? ' (model: ' + m.cfg.activeModel + ')' : '') + '. Switch models later in the Model panel.';
         statusProvider.className = 'status ok';
         btnFinish.disabled = false;
         setActive('finish');
@@ -517,9 +596,9 @@ window.addEventListener('message', (event) => {
     case 'providerCancelled': statusProvider.textContent = 'Cancelled. Pick a provider when you\\'re ready.'; statusProvider.className = 'status'; break;
     case 'providerError': statusProvider.textContent = 'Failed to save: ' + m.error; statusProvider.className = 'status err'; break;
     case 'providerSaved':
-      providerConfigured = true; activeProviderId = m.cfg.activeProvider;
+      providerConfigured = true; activeProviderId = m.cardId || m.cfg.activeProvider;
       stepProvider.classList.add('done');
-      statusProvider.textContent = 'Configured: ' + m.cfg.activeProvider + (m.cfg.activeModel ? ' → ' + m.cfg.activeModel : ' (model: auto — switch later in the Model panel)');
+      statusProvider.textContent = '\u2713 API key saved \u2014 ' + (m.cardLabel || m.cfg.activeProvider) + ' is ready' + (m.cfg.activeModel ? ' (model: ' + m.cfg.activeModel + ')' : '') + '. You can switch models later in the Model panel.';
       statusProvider.className = 'status ok';
       btnFinish.disabled = false;
       btnTest.disabled = false;

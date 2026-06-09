@@ -4,6 +4,15 @@
 
 # Changelog
 
+## 0.6.0 (2026-06-09)
+
+- Setup wizard: add **Ace Data Cloud** as a featured provider — one key for 50+ models (GPT, Claude, Gemini, …) via an OpenAI-compatible endpoint. Free sign-up with trial credits, then pay-as-you-go.
+- Setup wizard: when picking a provider that has a sign-up page, offer to open it first so users without an account can create one and copy their key before pasting.
+- Setup wizard: show a clear "✓ … is ready" confirmation after a key is saved, and correctly highlight the chosen provider card (including providers that map to a custom endpoint).
+- Setup wizard: recognize a configured Ace Data Cloud key on reload via its base URL, so the card stays highlighted and Test connection validates against the right endpoint.
+- Add **Hermes: Get API Key (Ace Data Cloud)** command.
+- Add `.vscode/launch.json` and `tasks.json` for one-key extension debugging (F5).
+
 ## 0.4.7 (2026-05-05)
 
 - Add Marketplace screenshots: streaming chat, setup wizard, sidebar panels.

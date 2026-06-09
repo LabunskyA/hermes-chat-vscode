@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { HermesChatViewProvider } from './chat-view-provider';
 import { MemoryTreeProvider, SkillsTreeProvider, CronTreeProvider, ModelTreeProvider, UsageTreeProvider } from './panels';
 import { spawn } from 'child_process';
-import { SetupWizard } from './setup-wizard';
+import { SetupWizard, REFERRAL_URL } from './setup-wizard';
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -129,6 +129,7 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('hermes-chat.refreshModel', () => modelProvider.refresh()),
         vscode.commands.registerCommand('hermes-chat.refreshUsage', () => usageProvider.refresh()),
         vscode.commands.registerCommand('hermes-chat.runSetup', () => SetupWizard.show(context)),
+        vscode.commands.registerCommand('hermes-chat.getApiKey', () => vscode.env.openExternal(vscode.Uri.parse(REFERRAL_URL))),
         vscode.commands.registerCommand('hermes-chat.switchModel', async () => {
             const providers = modelProvider.getProviders();
             const currentProvider = modelProvider.getActiveProvider();

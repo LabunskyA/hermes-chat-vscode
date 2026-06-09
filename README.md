@@ -87,6 +87,15 @@ Missing files show empty states in the sidebar. They do not mean the extension i
 
 Hermes responds through the same agent pipeline you use from the CLI, including memory, tools, skills, and configured MCP servers.
 
+## Need an API Key?
+
+If you don't already have a model provider key, the setup wizard offers **Ace Data Cloud** — one key that works with 50+ models (GPT, Claude, Gemini, and more) through an OpenAI-compatible endpoint. Sign-up is free and comes with trial credits; after that it's pay-as-you-go with no subscription.
+
+- In the setup wizard, pick **Ace Data Cloud** and paste your key, or
+- Run **Hermes: Get API Key (Ace Data Cloud)** from the Command Palette to create an account.
+
+You can use any other provider Hermes supports instead — Ace Data Cloud is just the quickest way to get a single key for many models.
+
 ## Tips
 
 - Select code before asking a question to include that snippet as context.
