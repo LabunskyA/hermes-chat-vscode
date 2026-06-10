@@ -4,6 +4,11 @@
 
 # Changelog
 
+## 0.6.1 (2026-06-10)
+
+- Route Ace Data sign-up links through a Cloudflare Worker redirect URL to enable click counting while preserving referral attribution.
+- Add `worker/` project with Wrangler config and KV-backed click counters (`/stats`) for referral funnel visibility.
+
 ## 0.6.0 (2026-06-09)
 
 - Setup wizard: add **Ace Data Cloud** as a featured provider — one key for 50+ models (GPT, Claude, Gemini, …) via an OpenAI-compatible endpoint. Free sign-up with trial credits, then pay-as-you-go.

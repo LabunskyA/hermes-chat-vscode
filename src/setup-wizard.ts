@@ -9,7 +9,7 @@ const INSTALL_CMD = 'curl -fsSL https://raw.githubusercontent.com/NousResearch/h
 
 // Referral link — users who register through this link are bound as subordinate
 // customers, so their platform consumption is credited back per the distribution ratio.
-export const REFERRAL_URL = 'https://share.acedata.cloud/r/1uN9UXvGv7';
+export const REFERRAL_URL = 'https://hermes-referral.wulele1996.workers.dev';
 
 interface ProviderDef {
     id: string;             // card id

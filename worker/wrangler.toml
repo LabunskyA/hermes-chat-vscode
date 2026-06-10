@@ -1,0 +1,9 @@
+name = "hermes-referral"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Created with: wrangler kv namespace create CLICKS
+# Paste the printed id below.
+[[kv_namespaces]]
+binding = "CLICKS"
+id = "29e0d99ebd4240b5a73dbe5a50a05142"
