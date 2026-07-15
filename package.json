@@ -1,8 +1,8 @@
 {
   "name": "hermes-chat",
   "displayName": "Hermes Agent Chat",
-  "description": "Streaming Hermes Agent chat with ACP, tool calls, memory, skills, models, cron jobs, and token usage",
-  "version": "0.6.1",
+  "description": "Persistent multi-agent Hermes chat with streaming ACP tools, workspace context, per-agent settings, memory, and history",
+  "version": "0.7.0",
   "publisher": "Poppywu124",
   "license": "MIT",
   "repository": {
@@ -59,36 +59,6 @@
           "id": "hermes-chat.chatView",
           "name": "Chat",
           "visibility": "visible"
-        },
-        {
-          "id": "hermes-chat.memoryView",
-          "name": "Memory",
-          "visibility": "collapsed",
-          "when": "hermes-chat.setupCompleted"
-        },
-        {
-          "id": "hermes-chat.skillsView",
-          "name": "Skills",
-          "visibility": "collapsed",
-          "when": "hermes-chat.setupCompleted"
-        },
-        {
-          "id": "hermes-chat.cronView",
-          "name": "Cron Jobs",
-          "visibility": "collapsed",
-          "when": "hermes-chat.setupCompleted"
-        },
-        {
-          "id": "hermes-chat.modelView",
-          "name": "Model",
-          "visibility": "collapsed",
-          "when": "hermes-chat.setupCompleted"
-        },
-        {
-          "id": "hermes-chat.usageView",
-          "name": "Token Usage",
-          "visibility": "collapsed",
-          "when": "hermes-chat.setupCompleted"
         }
       ]
     },
@@ -114,6 +84,11 @@
       {
         "command": "hermes-chat.getApiKey",
         "title": "Hermes: Get API Key (Ace Data Cloud)"
+      },
+      {
+        "command": "hermes-chat.refreshSettings",
+        "title": "Refresh Hermes Settings",
+        "icon": "$(refresh)"
       },
       {
         "command": "hermes-chat.refreshMemory",
@@ -159,55 +134,6 @@
         "icon": "$(refresh)"
       }
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "hermes-chat.newSession",
-          "when": "view == hermes-chat.chatView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.openChatPanel",
-          "when": "view == hermes-chat.chatView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.refreshMemory",
-          "when": "view == hermes-chat.memoryView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.refreshSkills",
-          "when": "view == hermes-chat.skillsView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.refreshCron",
-          "when": "view == hermes-chat.cronView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.createCron",
-          "when": "view == hermes-chat.cronView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "hermes-chat.switchModel",
-          "when": "view == hermes-chat.modelView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.refreshModel",
-          "when": "view == hermes-chat.modelView",
-          "group": "navigation"
-        },
-        {
-          "command": "hermes-chat.refreshUsage",
-          "when": "view == hermes-chat.usageView",
-          "group": "navigation"
-        }
-      ]
-    },
     "configuration": {
       "title": "Hermes Chat",
       "properties": {
@@ -227,6 +153,11 @@
           "default": 120,
           "minimum": 5,
           "description": "Maximum seconds to wait between streaming chunks during a chat prompt before considering it stalled. Total prompt duration is unbounded as long as Hermes keeps streaming."
+        },
+        "hermes-chat.autoApproveTools": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically approve Hermes permission requests (running terminal commands, writing memory/skills, editing files) without prompting. Leave off to review each request. Enabling this bypasses the safety gate."
         }
       }
     }

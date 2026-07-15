@@ -1,47 +1,45 @@
 # Hermes Agent Chat for VS Code
 
-The VS Code control center for [Hermes Agent](https://github.com/hermes-agent/hermes): streaming chat, tool calls, memory, skills, models, cron jobs, and token usage in one sidebar.
+Run persistent Hermes coding agents directly inside VS Code. Switch between isolated agent profiles, stream tool calls, attach workspace files, manage chat history, and configure each agent without leaving the editor.
 
-Hermes Agent Chat is built for developers who want the full Hermes agent loop inside the editor. It connects to Hermes through ACP, streams responses as they are generated, shows tool execution as it happens, and keeps useful agent state visible without leaving VS Code.
+Hermes Agent Chat connects to the local Hermes runtime through ACP. Each agent keeps its own model settings, personality, memory, session, and conversation history while sharing a focused VS Code-native chat experience.
 
 ## Screenshots
 
-> Drop PNGs into `media/screenshots/` with these filenames and they will render below.
+![Multi-agent chat](media/screenshots/chat-streaming.png)
 
-![Streaming chat with tool calls](media/screenshots/chat-streaming.png)
+*Chat with a selected Hermes agent, attach workspace context, and follow streamed responses and tool activity in place.*
 
-*Streaming chat in the sidebar — agent text, reasoning, and tool calls appear in place as Hermes works.*
+![Create an isolated agent](media/screenshots/create-agent.png)
 
-![Setup wizard](media/screenshots/setup-wizard.png)
+*Create a blank agent or clone an existing profile. Every agent gets isolated settings, memory, personality, and history.*
 
-*First-run setup wizard — install Hermes CLI, pick a provider, paste an API key, done.*
+![In-chat agent settings](media/screenshots/agent-settings.png)
 
-![Memory and skills panels](media/screenshots/panels.png)
-
-*Memory, Skills, Cron, Model, and Token Usage panels live next to the chat.*
+*Configure the active agent's provider, model, API key, personality, and memory without opening a terminal.*
 
 ## Highlights
 
-- **Streaming ACP chat** - Talk to Hermes Agent from the Activity Bar with live response updates.
-- **Tool call visibility** - See tool names, status, input, and output while Hermes works.
-- **Editor context** - Automatically includes the active file and selected code in your prompt.
-- **Memory and skills browser** - Inspect Hermes memory files and installed skills from the sidebar.
-- **Model controls** - View and switch configured providers and models from VS Code.
-- **Cron and usage panels** - Monitor scheduled Hermes jobs and token usage over time.
+- **Persistent multi-agent profiles** - Create and switch between isolated Hermes agents from the composer.
+- **Streaming ACP chat** - Follow agent responses, reasoning, permission requests, and tool calls live.
+- **Workspace context** - Automatically include the active editor selection or attach files from the workspace.
+- **Per-agent settings** - Configure provider, model, and API key in an in-chat settings page.
+- **Independent memory and history** - Keep sessions, personality, memory files, and chat history separate for every agent.
+- **Safe tool permissions** - Review tool requests interactively or explicitly enable automatic approval.
 
 ## Features
 
 | Capability | Included |
 |------------|----------|
-| Streaming Hermes Agent chat | Yes |
-| ACP protocol support | Yes |
-| Tool call visualization | Yes |
+| Persistent isolated agents | Yes |
+| Blank or cloned agent creation | Yes |
+| Per-agent provider and model settings | Yes |
+| Per-agent chat history and session resume | Yes |
+| Streaming ACP responses | Yes |
+| Tool call and permission visibility | Yes |
 | Active file and selection context | Yes |
-| Persistent session resume | Yes |
-| Hermes memory panel | Yes |
-| Skills browser | Yes |
-| Cron job viewer | Yes |
-| Model switcher | Yes |
+| Workspace file attachments | Yes |
+| Personality and memory file access | Yes |
 | Token usage tracking | Yes |
 
 ## Requirements
@@ -63,19 +61,8 @@ hermes acp
 
 If `hermes` is not on your `PATH`, set `hermes-chat.hermesPath` in VS Code to the full path of the Hermes executable.
 
-Hermes owns the agent runtime configuration. Model providers, API keys, tools, skills, MCP servers, and memory behavior are configured by Hermes itself, not inside this extension.
+Hermes remains the agent runtime. Common per-agent provider, model, and API key settings can be managed inside the extension; advanced tools, skills, MCP servers, and runtime behavior remain available through Hermes configuration.
 
-The sidebar reads local Hermes state when available:
-
-| Extension view | Local Hermes data used |
-|----------------|------------------------|
-| Memory | `~/.hermes/memories/USER.md`, `~/.hermes/memories/MEMORY.md`, `~/.hermes/SOUL.md` |
-| Skills | `~/.hermes/skills/` |
-| Cron Jobs | `~/.hermes/cron/jobs.json` |
-| Model | `~/.hermes/config.yaml` |
-| Token Usage | `~/.hermes/usage/usage.jsonl` |
-
-Missing files show empty states in the sidebar. They do not mean the extension is broken; they usually mean Hermes has not created that feature data yet.
 
 ## Getting Started
 
@@ -83,7 +70,7 @@ Missing files show empty states in the sidebar. They do not mean the extension i
 2. Run `hermes doctor` in a terminal.
 3. Install this extension.
 4. Click **Hermes Agent** in the Activity Bar.
-5. Type a message and press Enter.
+5. Choose an agent, attach any relevant files, and send a message.
 
 Hermes responds through the same agent pipeline you use from the CLI, including memory, tools, skills, and configured MCP servers.
 
@@ -100,15 +87,18 @@ You can use any other provider Hermes supports instead — Ace Data Cloud is jus
 
 - Select code before asking a question to include that snippet as context.
 - Use **Shift+Enter** for multi-line messages.
-- Click the **+** button in the chat toolbar to start a new Hermes session.
-- Open the Memory, Skills, Cron Jobs, Model, and Token Usage views to inspect Hermes state from the same sidebar.
+- Use the agent picker above the composer to switch profiles or create a new isolated agent.
+- Open the gear menu to update the active agent without launching terminal setup.
+- Use **New chat** to start a clean session while preserving earlier conversations in History.
 
 ## Extension Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `hermes-chat.hermesPath` | `hermes` | Path to the Hermes CLI executable |
-| `hermes-chat.timeout` | `180` | Query timeout in seconds |
+| `hermes-chat.timeout` | `30` | Timeout for short ACP control requests |
+| `hermes-chat.streamIdleTimeout` | `120` | Maximum idle time between streamed response chunks |
+| `hermes-chat.autoApproveTools` | `false` | Automatically approve tool permission requests; enable only when explicitly trusted |
 
 ## How It Works
 

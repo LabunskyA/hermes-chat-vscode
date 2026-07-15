@@ -410,41 +410,57 @@ export class SetupWizard {
             ? `\u2713 ${initialLabel} is ready${cfg.activeModel ? ' (model: ' + cfg.activeModel + ')' : ''}`
             : '';
         return /* html */ `<!doctype html>
-<html><head><meta charset="utf-8" /><style>
-body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 32px 40px; max-width: 760px; margin: 0 auto; line-height: 1.55; }
-h1 { font-size: 22px; margin: 0 0 4px; }
-.sub { color: var(--vscode-descriptionForeground); margin-bottom: 28px; }
-.step { border: 1px solid var(--vscode-panel-border); border-radius: 8px; padding: 20px 22px; margin-bottom: 16px; opacity: 0.55; transition: opacity 0.2s; }
-.step.active { opacity: 1; border-color: var(--vscode-focusBorder); }
+<html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><style>
+* { box-sizing: border-box; }
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 44px 32px 72px; max-width: 900px; margin: 0 auto; line-height: 1.55; }
+.hero { max-width: 620px; margin-bottom: 28px; }
+.eyebrow { margin-bottom: 8px; color: var(--vscode-textLink-foreground); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+h1 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.02em; }
+.sub { color: var(--vscode-descriptionForeground); font-size: 13px; }
+.progress { display: flex; align-items: center; gap: 0; margin: 0 0 22px; }
+.progress-item { display: flex; align-items: center; gap: 7px; color: var(--vscode-descriptionForeground); font-size: 11px; white-space: nowrap; }
+.progress-dot { width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); border-radius: 50%; font-size: 10px; font-weight: 600; }
+.progress-line { width: 42px; height: 1px; margin: 0 8px; background: var(--vscode-widget-border, var(--vscode-panel-border)); }
+.step { position: relative; border: 1px solid color-mix(in srgb, var(--vscode-panel-border, #555) 72%, transparent); border-radius: 11px; padding: 22px 24px; margin-bottom: 14px; opacity: .54; transition: opacity .18s, border-color .18s, background .18s; }
+.step.active { opacity: 1; border-color: color-mix(in srgb, var(--vscode-focusBorder) 72%, var(--vscode-panel-border, #555)); background: color-mix(in srgb, var(--vscode-focusBorder) 3%, transparent); }
 .step.done { opacity: 1; }
-.step h2 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-.badge { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); text-align: center; line-height: 22px; font-size: 12px; font-weight: 600; }
-.step.done .badge { background: var(--vscode-testing-iconPassed); color: white; }
-.step p { margin: 6px 0 12px; color: var(--vscode-descriptionForeground); }
-button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; margin-right: 8px; }
+.step h2 { margin: 0 0 7px; font-size: 15px; display: flex; align-items: center; gap: 9px; }
+.badge { display: grid; place-items: center; width: 23px; height: 23px; flex: 0 0 auto; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); border-radius: 7px; color: var(--vscode-descriptionForeground); font-size: 11px; font-weight: 600; }
+.step.active .badge { border-color: var(--vscode-focusBorder); color: var(--vscode-textLink-foreground); }
+.step.done .badge { border-color: var(--vscode-testing-iconPassed); background: color-mix(in srgb, var(--vscode-testing-iconPassed) 14%, transparent); color: var(--vscode-testing-iconPassed); }
+.step p { margin: 6px 0 14px; color: var(--vscode-descriptionForeground); font-size: 12px; }
+button { min-height: 32px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 1px solid var(--vscode-button-border, transparent); padding: 6px 13px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12px; margin: 0 5px 5px 0; }
 button:hover { background: var(--vscode-button-hoverBackground); }
-button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-.status { margin-top: 10px; font-size: 12px; color: var(--vscode-descriptionForeground); min-height: 16px; }
+button.secondary { border-color: color-mix(in srgb, var(--vscode-widget-border, #555) 72%, transparent); background: transparent; color: var(--vscode-foreground); }
+button.secondary:hover { background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
+button:disabled { opacity: .42; cursor: not-allowed; }
+.status { margin-top: 8px; font-size: 11px; color: var(--vscode-descriptionForeground); min-height: 16px; }
 .status.ok { color: var(--vscode-testing-iconPassed); }
 .status.err { color: var(--vscode-errorForeground); }
-details { margin-top: 12px; font-size: 12px; }
-summary { cursor: pointer; color: var(--vscode-textLink-foreground); }
-pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; border-radius: 4px; font-size: 11px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
-.windows-help { background: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-textBlockQuote-border); padding: 10px 14px; margin-top: 12px; font-size: 12px; display: none; }
+details { margin-top: 11px; font-size: 11px; }
+summary { width: fit-content; cursor: pointer; color: var(--vscode-textLink-foreground); user-select: none; }
+pre { background: var(--vscode-textCodeBlock-background); border: 1px solid color-mix(in srgb, var(--vscode-widget-border, #555) 60%, transparent); padding: 10px 12px; border-radius: 6px; font: 11px var(--vscode-editor-font-family); overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+code { padding: 1px 4px; border-radius: 4px; background: var(--vscode-textCodeBlock-background); font-family: var(--vscode-editor-font-family); }
+.windows-help { background: var(--vscode-textBlockQuote-background); border-left: 2px solid var(--vscode-textBlockQuote-border); padding: 10px 12px; margin-top: 10px; font-size: 11px; display: none; }
 .windows-help.show { display: block; }
-.providers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
-.provider-card { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; background: transparent; text-align: left; color: inherit; font-size: 13px; font-family: inherit; }
-.provider-card:hover:not(:disabled) { border-color: var(--vscode-focusBorder); background: var(--vscode-list-hoverBackground); }
-.provider-card .name { font-weight: 600; margin-bottom: 2px; }
-.provider-card .hint { font-size: 11px; color: var(--vscode-descriptionForeground); }
-.provider-card.active-provider { border-color: var(--vscode-testing-iconPassed); }
-.referral { border: 1px solid var(--vscode-focusBorder); border-radius: 6px; padding: 12px 14px; margin: 4px 0 14px; background: var(--vscode-textBlockQuote-background); font-size: 12px; }
-.referral b { font-size: 13px; }
-.referral a { color: var(--vscode-textLink-foreground); cursor: pointer; }
+.providers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.provider-card { position: relative; min-height: 70px; border: 1px solid color-mix(in srgb, var(--vscode-panel-border, #555) 74%, transparent); border-radius: 8px; padding: 12px 13px; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; background: transparent; text-align: left; color: inherit; font-family: inherit; }
+.provider-card:hover:not(:disabled) { border-color: var(--vscode-focusBorder); background: var(--vscode-list-hoverBackground); transform: translateY(-1px); }
+.provider-card .name { padding-right: 18px; font-size: 12px; font-weight: 600; line-height: 1.3; }
+.provider-card .hint { margin-top: 4px; font-size: 10px; line-height: 1.35; color: var(--vscode-descriptionForeground); }
+.provider-card.active-provider { border-color: var(--vscode-testing-iconPassed); background: color-mix(in srgb, var(--vscode-testing-iconPassed) 6%, transparent); }
+.provider-card.active-provider::after { content: '✓'; position: absolute; top: 10px; right: 11px; color: var(--vscode-testing-iconPassed); font-size: 12px; }
+.provider-card:first-child { grid-column: 1 / -1; min-height: 64px; border-color: color-mix(in srgb, var(--vscode-focusBorder) 58%, var(--vscode-panel-border, #555)); }
+.referral { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 55%, var(--vscode-panel-border, #555)); border-radius: 8px; padding: 11px 13px; margin: 4px 0 13px; background: color-mix(in srgb, var(--vscode-focusBorder) 6%, transparent); font-size: 11px; }
+.referral-copy { min-width: 0; color: var(--vscode-descriptionForeground); }
+.referral b { color: var(--vscode-foreground); font-size: 12px; }
+.referral a { flex: 0 0 auto; color: var(--vscode-textLink-foreground); cursor: pointer; font-weight: 500; white-space: nowrap; }
+.more-provider-row { display: flex; gap: 7px; align-items: center; margin-top: 9px; }
+select { flex: 1; min-width: 0; padding: 7px 9px; background: var(--vscode-dropdown-background, var(--vscode-input-background)); color: var(--vscode-dropdown-foreground, var(--vscode-input-foreground)); border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, var(--vscode-panel-border))); border-radius: 6px; }
+@media (max-width: 620px) { body { padding: 28px 18px 48px; } .providers { grid-template-columns: 1fr; } .provider-card:first-child { grid-column: auto; } .referral { align-items: flex-start; flex-direction: column; gap: 7px; } .progress-item span:last-child { display: none; } .progress-line { width: 24px; } }
 </style></head><body>
-<h1>Welcome to Hermes Agent Chat</h1>
-<div class="sub">A couple of quick steps and you'll be chatting with Hermes inside VS Code.</div>
+<div class="hero"><div class="eyebrow">Hermes Agent</div><h1>Set up your coding agent</h1><div class="sub">Connect the local Hermes runtime to your preferred model provider. Configuration stays on this machine.</div></div>
+<div class="progress"><div class="progress-item"><span class="progress-dot">1</span><span>Install</span></div><span class="progress-line"></span><div class="progress-item"><span class="progress-dot">2</span><span>Provider</span></div><span class="progress-line"></span><div class="progress-item"><span class="progress-dot">3</span><span>Start chatting</span></div></div>
 
 <div class="step ${installed ? 'done' : 'active'}" id="step-install">
   <h2><span class="badge">1</span> Install Hermes CLI</h2>
@@ -462,15 +478,15 @@ pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; bo
 
 <div class="step ${cfg.providerConfigured ? 'done' : (installed ? 'active' : '')}" id="step-provider">
   <h2><span class="badge">2</span> Pick a model provider</h2>
-  <p>Choose where Hermes should send requests. Your API key is stored locally in <code>~/.hermes/.env</code>.</p>
+  <p>Choose where Hermes should send requests. Keys are stored locally in <code>~/.hermes/.env</code>.</p>
   <div class="referral">
-    <b>No API key yet?</b> <b>Ace Data Cloud</b> gives one key for 50+ models (GPT, Claude, Gemini, …). Free to sign up with trial credits, then pay-as-you-go — no subscription.
-    <a id="link-referral">Create a free account →</a>
+    <div class="referral-copy"><b>No API key yet? Ace Data Cloud</b><br>One key for 50+ models, free trial credits, then pay as you go.</div>
+    <a id="link-referral">Create free account →</a>
   </div>
   <div class="providers" id="providers"></div>
   <details style="margin-top:14px"><summary>More providers (Kimi, GLM, MiniMax, NVIDIA, …)</summary>
-    <div style="display:flex; gap:8px; align-items:center; margin-top:10px">
-      <select id="more-select" style="flex:1; padding:6px 8px; background:var(--vscode-input-background); color:var(--vscode-input-foreground); border:1px solid var(--vscode-input-border, var(--vscode-panel-border)); border-radius:4px;">
+    <div class="more-provider-row">
+      <select id="more-select">
         <option value="">Select a provider…</option>
       </select>
       <button id="btn-more-pick">Use this provider</button>
@@ -486,7 +502,7 @@ pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; bo
 
 <div class="step ${cfg.providerConfigured ? 'active' : ''}" id="step-finish">
   <h2><span class="badge">3</span> Start chatting</h2>
-  <p>You're ready to go.</p>
+  <p>Your local agent is ready. You can change providers later from the chat settings menu.</p>
   <button id="btn-finish" ${cfg.providerConfigured ? '' : 'disabled'}>Open Hermes Chat</button>
 </div>
 
@@ -520,7 +536,7 @@ function renderProviders() {
     const btn = document.createElement('button');
     btn.className = 'provider-card' + (activeProviderId === p.id ? ' active-provider' : '');
     btn.disabled = !installed;
-    const hint = p.id === 'acedata' ? 'Recommended · 50+ models · free signup' : (p.envKey ? 'Needs API key' : (p.id === 'nous' ? 'OAuth (hermes auth)' : p.id === 'custom' ? 'OpenAI-compatible endpoint' : 'No key'));
+    const hint = p.id === 'acedata' ? 'Recommended · GPT, Claude, Gemini, and more' : (p.envKey ? 'Connect with an API key' : (p.id === 'nous' ? 'Connect through Hermes OAuth' : p.id === 'custom' ? 'Ollama, LM Studio, Agent Maestro, or custom endpoint' : 'No API key required'));
     btn.innerHTML = '<div class="name">' + p.label + '</div><div class="hint">' + hint + '</div>';
     btn.onclick = () => vscode.postMessage({ type: 'pickProvider', providerId: p.id });
     providersEl.appendChild(btn);

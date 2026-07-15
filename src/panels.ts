@@ -437,3 +437,92 @@ export class UsageItem extends vscode.TreeItem {
         );
     }
 }
+
+// ============================================================
+// Unified Settings Panel
+// ============================================================
+
+type SettingsSectionId = 'memory' | 'skills' | 'cron' | 'model' | 'usage';
+type SettingsChild = MemoryItem | SkillItem | CronItem | ModelItem | UsageItem;
+type SettingsNode = SettingsSection | SettingsChild;
+
+class SettingsSection extends vscode.TreeItem {
+    constructor(
+        label: string,
+        readonly sectionId: SettingsSectionId,
+        icon: string,
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.Collapsed);
+        this.iconPath = new vscode.ThemeIcon(icon);
+        this.contextValue = `settingsSection.${sectionId}`;
+    }
+}
+
+export class SettingsTreeProvider implements vscode.TreeDataProvider<SettingsNode> {
+    private readonly _onDidChangeTreeData = new vscode.EventEmitter<SettingsNode | undefined>();
+    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+    private readonly childSections = new WeakMap<object, SettingsSectionId>();
+    private readonly sections = [
+        new SettingsSection('Memory', 'memory', 'book'),
+        new SettingsSection('Skills', 'skills', 'sparkle'),
+        new SettingsSection('Cron Jobs', 'cron', 'clock'),
+        new SettingsSection('Model', 'model', 'symbol-parameter'),
+        new SettingsSection('Token Usage', 'usage', 'graph'),
+    ];
+
+    constructor(
+        private readonly memory: MemoryTreeProvider,
+        private readonly skills: SkillsTreeProvider,
+        private readonly cron: CronTreeProvider,
+        private readonly model: ModelTreeProvider,
+        private readonly usage: UsageTreeProvider,
+    ) {}
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire(undefined);
+    }
+
+    getTreeItem(element: SettingsNode): vscode.TreeItem {
+        if (element instanceof SettingsSection) return element;
+        const section = this.childSections.get(element);
+        switch (section) {
+            case 'memory': return this.memory.getTreeItem(element as MemoryItem);
+            case 'skills': return this.skills.getTreeItem(element as SkillItem);
+            case 'cron': return this.cron.getTreeItem(element as CronItem);
+            case 'model': return this.model.getTreeItem(element as ModelItem);
+            case 'usage': return this.usage.getTreeItem(element as UsageItem);
+            default: return element;
+        }
+    }
+
+    async getChildren(element?: SettingsNode): Promise<SettingsNode[]> {
+        if (!element) return this.sections;
+
+        const section = element instanceof SettingsSection
+            ? element.sectionId
+            : this.childSections.get(element);
+        if (!section) return [];
+
+        let children: SettingsChild[];
+        switch (section) {
+            case 'memory':
+                children = await this.memory.getChildren(element instanceof SettingsSection ? undefined : element as MemoryItem);
+                break;
+            case 'skills':
+                children = await this.skills.getChildren(element instanceof SettingsSection ? undefined : element as SkillItem);
+                break;
+            case 'cron':
+                children = element instanceof SettingsSection ? await this.cron.getChildren() : [];
+                break;
+            case 'model':
+                children = await this.model.getChildren(element instanceof SettingsSection ? undefined : element as ModelItem);
+                break;
+            case 'usage':
+                children = element instanceof SettingsSection ? await this.usage.getChildren() : [];
+                break;
+        }
+
+        for (const child of children) this.childSections.set(child, section);
+        return children;
+    }
+}

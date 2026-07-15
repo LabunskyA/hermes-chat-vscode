@@ -7,5 +7,7 @@ test/**
 tsconfig.json
 node_modules/@types/**
 node_modules/.package-lock.json
-*.map
+**/*.map
+docs/**
+worker/**
 *.vsix

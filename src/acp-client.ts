@@ -43,6 +43,28 @@ export interface ToolCall {
     rawOutput?: unknown;
 }
 
+export interface PermissionOption {
+    optionId: string;
+    name: string;
+    kind: string;
+}
+
+export interface PermissionRequest {
+    options?: PermissionOption[];
+    toolCall?: { title?: string; kind?: string; [key: string]: unknown };
+    [key: string]: unknown;
+}
+
+/**
+ * Resolves a permission request to the chosen optionId, or `undefined`/`null`
+ * to fall back to the safe default (deny).
+ */
+export type PermissionHandler = (request: PermissionRequest) => Promise<string | undefined | null>;
+
+export function getAcpArgs(profile = 'default'): string[] {
+    return profile === 'default' ? ['acp'] : ['-p', profile, 'acp'];
+}
+
 interface PendingRequest {
     resolve: (v: unknown) => void;
     reject: (e: Error) => void;
@@ -63,7 +85,14 @@ export class AcpClient extends EventEmitter {
     private streamIdleTimeoutMs: number;
     private stopping = false;
 
-    constructor(hermesPath: string, requestTimeoutMs = 30_000, streamIdleTimeoutMs = 120_000) {
+    /**
+     * Optional gate for `session/request_permission`. When set, the chosen
+     * optionId is sent back to Hermes. When unset (or it resolves to a falsy
+     * value), the request is denied by default.
+     */
+    public permissionHandler: PermissionHandler | null = null;
+
+    constructor(hermesPath: string, requestTimeoutMs = 30_000, streamIdleTimeoutMs = 120_000, private readonly profile = 'default') {
         super();
         this.hermesPath = hermesPath;
         this.requestTimeoutMs = requestTimeoutMs;
@@ -96,7 +125,7 @@ export class AcpClient extends EventEmitter {
 
         this.stopping = false;
 
-        this.proc = spawn(this.hermesPath, ['acp'], {
+        this.proc = spawn(this.hermesPath, getAcpArgs(this.profile), {
             env: { ...process.env },
             stdio: ['pipe', 'pipe', 'pipe'],
         });
@@ -212,14 +241,31 @@ export class AcpClient extends EventEmitter {
     }
 
     private async handlePermissionRequest(id: number, params: Record<string, unknown> | undefined): Promise<void> {
-        // Auto-allow for now; user can be prompted in future
-        const options = params?.options as Array<{ optionId: string; name: string; kind: string }> | undefined;
-        const allowOnce = options?.find((o) => o.kind === 'allow_once');
-        const allowAlways = options?.find((o) => o.kind === 'allow_always');
-        const chosen = allowAlways || allowOnce || options?.[0];
-        this.sendResponse(id, {
-            outcome: { outcome: 'selected', optionId: chosen?.optionId ?? 'allow' },
-        });
+        const options = (params?.options as PermissionOption[] | undefined) ?? [];
+
+        let chosenId: string | undefined | null;
+        if (this.permissionHandler) {
+            try {
+                chosenId = await this.permissionHandler(params as PermissionRequest);
+            } catch (e) {
+                this.emit('log', `[permission handler error] ${e instanceof Error ? e.message : String(e)}\n`);
+                chosenId = undefined;
+            }
+        }
+
+        if (!chosenId) {
+            // No handler, dismissal, or error -> deny by default (fail safe).
+            const reject = options.find((o) => o.kind && o.kind.startsWith('reject'));
+            chosenId = reject?.optionId;
+        }
+
+        if (chosenId) {
+            this.sendResponse(id, { outcome: { outcome: 'selected', optionId: chosenId } });
+        } else {
+            // No explicit reject option advertised; signal cancellation so Hermes
+            // does not proceed with the requested action.
+            this.sendResponse(id, { outcome: { outcome: 'cancelled' } });
+        }
     }
 
     private async handleReadFile(id: number, params: Record<string, unknown> | undefined): Promise<void> {

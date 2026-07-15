@@ -1,8 +1,12 @@
 # Changelog
 
-# Changelog
+## 0.7.0 (2026-07-16)
 
-# Changelog
+- Add persistent, isolated Hermes agents backed by native profiles, with agent switching, creation, per-agent sessions, chat history, memory, and model settings.
+- Add an in-chat settings page for provider, model, and API key configuration without opening a terminal.
+- Add permission request handling with an optional auto-approve setting.
+- Redesign the chat composer, agent creation dialog, history, settings, and status surfaces.
+- Improve ACP session resume behavior and preserve streamed history when restoring sessions.
 
 ## 0.6.1 (2026-06-10)
 

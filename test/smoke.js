@@ -9,6 +9,10 @@ const path = require('path');
 const assert = require('assert');
 
 const { AcpClient } = require('../out/acp-client.js');
+const { getAcpArgs } = require('../out/acp-client.js');
+const { ProfileStore } = require('../out/profile-store.js');
+const fs = require('fs');
+const os = require('os');
 
 const FAKE_SERVER = path.join(__dirname, 'fake-acp-server.js');
 
@@ -57,6 +61,47 @@ class TestAcpClient extends BaseAcpClient {
 
 (async () => {
     console.log('AcpClient smoke tests');
+
+    await test('ACP args isolate named profiles', async () => {
+        assert.deepStrictEqual(getAcpArgs('default'), ['acp']);
+        assert.deepStrictEqual(getAcpArgs('coder'), ['-p', 'coder', 'acp']);
+    });
+
+    await test('ProfileStore discovers isolated profiles', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-profiles-'));
+        fs.writeFileSync(path.join(root, 'config.yaml'), 'model:\n  provider: custom\n  default: root-model\n');
+        fs.mkdirSync(path.join(root, 'profiles', 'coder'), { recursive: true });
+        fs.writeFileSync(path.join(root, 'profiles', 'coder', 'config.yaml'), 'model:\n  provider: openai-api\n  default: coder-model\n');
+        fs.writeFileSync(path.join(root, 'profiles', 'coder', 'profile.yaml'), 'description: Coding specialist\n');
+        const profiles = new ProfileStore(root).list();
+        assert.deepStrictEqual(profiles.map((profile) => profile.name), ['default', 'coder']);
+        assert.strictEqual(profiles[1].description, 'Coding specialist');
+        assert.strictEqual(profiles[1].model, 'coder-model');
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    await test('ProfileStore saves settings inside the selected profile', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-profile-settings-'));
+        fs.mkdirSync(path.join(root, 'profiles', 'coder'), { recursive: true });
+        const store = new ProfileStore(root);
+        const settings = store.saveSettings('coder', 'anthropic', 'claude-sonnet', 'secret-key');
+        assert.deepStrictEqual(settings, { provider: 'anthropic', model: 'claude-sonnet', apiKeyConfigured: true });
+        assert.match(fs.readFileSync(path.join(root, 'profiles', 'coder', 'config.yaml'), 'utf8'), /provider: anthropic/);
+        assert.match(fs.readFileSync(path.join(root, 'profiles', 'coder', '.env'), 'utf8'), /ANTHROPIC_API_KEY=secret-key/);
+        assert.strictEqual(fs.existsSync(path.join(root, '.env')), false, 'named profile key must not leak into the default profile');
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    await test('ProfileStore preserves arbitrary Hermes providers and checks the matching key', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-provider-settings-'));
+        fs.writeFileSync(path.join(root, 'config.yaml'), 'model:\n  provider: openai-api\n  default: gpt-test\n');
+        fs.writeFileSync(path.join(root, '.env'), 'ANTHROPIC_API_KEY=unrelated\nOPENAI_API_KEY=configured\n');
+        const store = new ProfileStore(root);
+        assert.deepStrictEqual(store.getSettings('default'), { provider: 'openai-api', model: 'gpt-test', apiKeyConfigured: true });
+        store.saveSettings('default', 'my-private-gateway', 'private-model');
+        assert.strictEqual(store.getSettings('default').provider, 'my-private-gateway');
+        fs.rmSync(root, { recursive: true, force: true });
+    });
 
     await test('initialize succeeds', async () => {
         const c = new TestAcpClient('node', 5000, 5000);

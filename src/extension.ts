@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { HermesChatViewProvider } from './chat-view-provider';
-import { MemoryTreeProvider, SkillsTreeProvider, CronTreeProvider, ModelTreeProvider, UsageTreeProvider } from './panels';
+import { MemoryTreeProvider, SkillsTreeProvider, CronTreeProvider, ModelTreeProvider, UsageTreeProvider, SettingsTreeProvider } from './panels';
 import { spawn } from 'child_process';
 import { SetupWizard, REFERRAL_URL } from './setup-wizard';
 
@@ -63,23 +63,20 @@ export async function activate(context: vscode.ExtensionContext) {
     const cronProvider = new CronTreeProvider();
     const modelProvider = new ModelTreeProvider();
     const usageProvider = new UsageTreeProvider();
+    const settingsProvider = new SettingsTreeProvider(memoryProvider, skillsProvider, cronProvider, modelProvider, usageProvider);
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(HermesChatViewProvider.viewType, chatProvider),
-        vscode.window.registerTreeDataProvider('hermes-chat.memoryView', memoryProvider),
-        vscode.window.registerTreeDataProvider('hermes-chat.skillsView', skillsProvider),
-        vscode.window.registerTreeDataProvider('hermes-chat.cronView', cronProvider),
-        vscode.window.registerTreeDataProvider('hermes-chat.modelView', modelProvider),
-        vscode.window.registerTreeDataProvider('hermes-chat.usageView', usageProvider),
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('hermes-chat.newSession', () => chatProvider.newSession()),
         vscode.commands.registerCommand('hermes-chat.openChatPanel', () => chatProvider.openPanel()),
         vscode.commands.registerCommand('hermes-chat.clearChat', () => chatProvider.clearChat()),
-        vscode.commands.registerCommand('hermes-chat.refreshMemory', () => memoryProvider.refresh()),
-        vscode.commands.registerCommand('hermes-chat.refreshSkills', () => skillsProvider.refresh()),
-        vscode.commands.registerCommand('hermes-chat.refreshCron', () => cronProvider.refresh()),
+        vscode.commands.registerCommand('hermes-chat.refreshMemory', () => settingsProvider.refresh()),
+        vscode.commands.registerCommand('hermes-chat.refreshSkills', () => settingsProvider.refresh()),
+        vscode.commands.registerCommand('hermes-chat.refreshCron', () => settingsProvider.refresh()),
+        vscode.commands.registerCommand('hermes-chat.refreshSettings', () => settingsProvider.refresh()),
         vscode.commands.registerCommand('hermes-chat.openCronJob', async (job: unknown) => {
             const doc = await vscode.workspace.openTextDocument({
                 language: 'json',
@@ -120,14 +117,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
             if (result.code === 0) {
                 vscode.window.showInformationMessage(`Cron job created.${result.stdout.trim() ? ' ' + result.stdout.trim().split('\n')[0] : ''}`);
-                cronProvider.refresh();
+                settingsProvider.refresh();
             } else {
                 const err = (result.stderr || result.stdout || `exit ${result.code}`).trim();
                 vscode.window.showErrorMessage(`Failed to create cron job: ${err}`);
             }
         }),
-        vscode.commands.registerCommand('hermes-chat.refreshModel', () => modelProvider.refresh()),
-        vscode.commands.registerCommand('hermes-chat.refreshUsage', () => usageProvider.refresh()),
+        vscode.commands.registerCommand('hermes-chat.refreshModel', () => settingsProvider.refresh()),
+        vscode.commands.registerCommand('hermes-chat.refreshUsage', () => settingsProvider.refresh()),
         vscode.commands.registerCommand('hermes-chat.runSetup', () => SetupWizard.show(context)),
         vscode.commands.registerCommand('hermes-chat.getApiKey', () => vscode.env.openExternal(vscode.Uri.parse(REFERRAL_URL))),
         vscode.commands.registerCommand('hermes-chat.switchModel', async () => {
@@ -172,6 +169,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 : modelId;
 
             modelProvider.setActiveModel(modelId, pickedProvider.providerId);
+            settingsProvider.refresh();
             const status = vscode.window.setStatusBarMessage(`$(sync~spin) Switching to ${modelId}...`);
 
             chatProvider.switchModel(fullModelId).then(
@@ -182,6 +180,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 (err: unknown) => {
                     status.dispose();
                     if (currentModel && currentProvider) modelProvider.setActiveModel(currentModel, currentProvider);
+                    settingsProvider.refresh();
                     const msg = err instanceof Error ? err.message : String(err);
                     vscode.window.showErrorMessage(`Failed to switch model: ${msg}`);
                 },
@@ -196,6 +195,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
             // Optimistic UI: update tree and status immediately
             modelProvider.setActiveModel(modelId, provider);
+            settingsProvider.refresh();
             const status = vscode.window.setStatusBarMessage(`$(sync~spin) Switching to ${modelId}...`);
 
             chatProvider.switchModel(fullModelId).then(
@@ -206,6 +206,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 (err: unknown) => {
                     status.dispose();
                     if (prevModel && prevProvider) modelProvider.setActiveModel(prevModel, prevProvider);
+                    settingsProvider.refresh();
                     const msg = err instanceof Error ? err.message : String(err);
                     vscode.window.showErrorMessage(`Failed to switch model: ${msg}`);
                 },
