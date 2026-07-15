@@ -8,6 +8,8 @@ Drop PNGs here with these exact filenames so the README renders them:
 | `create-agent.png` | Create-agent dialog showing name, role, starting point, and the primary Create agent action. |
 | `agent-settings.png` | In-chat Agent settings page showing the profile card and model connection fields. Never expose a real API key. |
 
+`setup-wizard.png` and `panels.png` are retained as compatibility paths for cached Marketplace details from older releases.
+
 ## Tips
 
 - Use a clean VS Code window and the same theme for all screenshots.
