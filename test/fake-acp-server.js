@@ -7,6 +7,7 @@
 // streaming agent_message_chunk updates.
 
 const KNOWN_SESSIONS = new Set();
+const SESSION_METADATA = new Map();
 
 function send(msg) {
     process.stdout.write(JSON.stringify(msg) + '\n');
@@ -28,7 +29,11 @@ function handle(req) {
                 jsonrpc: '2.0',
                 id,
                 result: {
-                    agentCapabilities: { loadSession: true, promptCapabilities: { image: true }, sessionCapabilities: { resume: {} } },
+                    agentCapabilities: {
+                        loadSession: true,
+                        promptCapabilities: { image: true },
+                        sessionCapabilities: { fork: {}, list: {}, resume: {} },
+                    },
                     agentInfo: { name: 'fake-hermes', version: '0.0.1' },
                     protocolVersion: 1,
                 },
@@ -37,7 +42,58 @@ function handle(req) {
         case 'session/new': {
             const sid = uuid();
             KNOWN_SESSIONS.add(sid);
+            SESSION_METADATA.set(sid, {
+                sessionId: sid,
+                cwd: params?.cwd || '.',
+                title: 'Fake Hermes session',
+                updatedAt: '2026-07-16T12:00:00Z',
+            });
             send({ jsonrpc: '2.0', id, result: { sessionId: sid } });
+            break;
+        }
+        case 'session/list': {
+            send({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                    sessions: Array.from(SESSION_METADATA.values()),
+                    nextCursor: params?.cursor ? null : 'page-2',
+                },
+            });
+            break;
+        }
+        case 'session/load': {
+            const sid = params?.sessionId;
+            if (!sid || !KNOWN_SESSIONS.has(sid)) {
+                send({ jsonrpc: '2.0', id, result: null });
+                break;
+            }
+            notify('session/update', {
+                sessionId: sid,
+                update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Earlier question' } },
+            });
+            notify('session/update', {
+                sessionId: sid,
+                update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Earlier answer' } },
+            });
+            send({ jsonrpc: '2.0', id, result: { models: null, modes: null } });
+            break;
+        }
+        case 'session/fork': {
+            const source = params?.sessionId;
+            if (!source || !KNOWN_SESSIONS.has(source)) {
+                send({ jsonrpc: '2.0', id, result: { sessionId: '' } });
+                break;
+            }
+            const sid = uuid();
+            KNOWN_SESSIONS.add(sid);
+            SESSION_METADATA.set(sid, {
+                sessionId: sid,
+                cwd: params?.cwd || '.',
+                title: 'Fork of Fake Hermes session',
+                updatedAt: '2026-07-16T12:05:00Z',
+            });
+            send({ jsonrpc: '2.0', id, result: { sessionId: sid, models: null, modes: null } });
             break;
         }
         case 'session/resume': {

@@ -11,6 +11,7 @@ const assert = require('assert');
 const { AcpClient } = require('../out/acp-client.js');
 const { getAcpArgs } = require('../out/acp-client.js');
 const { ProfileStore } = require('../out/profile-store.js');
+const { createTurnState, reduceTurn } = require('../out/turn-state.js');
 const fs = require('fs');
 const os = require('os');
 
@@ -103,6 +104,58 @@ class TestAcpClient extends BaseAcpClient {
         fs.rmSync(root, { recursive: true, force: true });
     });
 
+    await test('turn state accumulates streamed assistant text', async () => {
+        const initial = createTurnState(1234);
+        const next = reduceTurn(initial, {
+            sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: 'Hello' },
+        });
+        const complete = reduceTurn(next, {
+            sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: ', world!' },
+        });
+        assert.strictEqual(complete.message.content, 'Hello, world!');
+        assert.strictEqual(complete.message.timestamp, 1234);
+        assert.strictEqual(initial.message.content, '', 'reducer must not mutate prior state');
+    });
+
+    await test('turn state tracks tool calls through failure', async () => {
+        const started = reduceTurn(createTurnState(), {
+            sessionUpdate: 'tool_call',
+            toolCallId: 'tool-1',
+            title: 'Run tests',
+            status: 'in_progress',
+            rawInput: { command: 'npm test' },
+        });
+        const failed = reduceTurn(started, {
+            sessionUpdate: 'tool_call_update',
+            toolCallId: 'tool-1',
+            status: 'completed',
+            rawOutput: { error: 'tests failed' },
+        });
+        assert.deepStrictEqual(failed.message.toolCalls, [{
+            id: 'tool-1',
+            name: 'Run tests',
+            status: 'failed',
+            args: { command: 'npm test' },
+            result: '{"error":"tests failed"}',
+        }]);
+        assert.strictEqual(started.message.toolCalls[0].status, 'in_progress', 'reducer must not mutate prior tool calls');
+    });
+
+    await test('turn state retains thought and latest usage updates', async () => {
+        const thinking = reduceTurn(createTurnState(), {
+            sessionUpdate: 'agent_thought_chunk',
+            content: { type: 'text', text: 'Checking the workspace' },
+        });
+        const measured = reduceTurn(thinking, {
+            sessionUpdate: 'usage_update',
+            usage: { inputTokens: 12, outputTokens: 5, totalTokens: 17 },
+        });
+        assert.strictEqual(measured.thought, 'Checking the workspace');
+        assert.deepStrictEqual(measured.message.usage, { inputTokens: 12, outputTokens: 5, totalTokens: 17 });
+    });
+
     await test('initialize succeeds', async () => {
         const c = new TestAcpClient('node', 5000, 5000);
         await c.start();
@@ -115,6 +168,49 @@ class TestAcpClient extends BaseAcpClient {
         await c.start();
         const sid = await c.newSession('/tmp');
         assert.ok(sid && typeof sid === 'string', 'expected non-empty sessionId, got ' + sid);
+        c.stop();
+    });
+
+    await test('listSessions preserves Hermes session metadata and pagination', async () => {
+        const c = new TestAcpClient('node', 5000, 5000);
+        await c.start();
+        const sid = await c.newSession('/tmp/project');
+        const page = await c.listSessions('/tmp/project');
+        assert.deepStrictEqual(page, {
+            sessions: [{
+                sessionId: sid,
+                cwd: '/tmp/project',
+                title: 'Fake Hermes session',
+                updatedAt: '2026-07-16T12:00:00Z',
+            }],
+            nextCursor: 'page-2',
+        });
+        c.stop();
+    });
+
+    await test('loadSession captures replay updates before becoming active', async () => {
+        const c = new TestAcpClient('node', 5000, 5000);
+        const replay = [];
+        c.on('sessionUpdate', (event) => replay.push(event.update));
+        await c.start();
+        const sid = await c.newSession('/tmp/project');
+        await c.loadSession(sid, '/tmp/project');
+        assert.strictEqual(c.getSessionId(), sid);
+        assert.deepStrictEqual(replay.map((update) => update.sessionUpdate), [
+            'user_message_chunk',
+            'agent_message_chunk',
+        ]);
+        c.stop();
+    });
+
+    await test('forkSession activates the Hermes-created child session', async () => {
+        const c = new TestAcpClient('node', 5000, 5000);
+        await c.start();
+        const source = await c.newSession('/tmp/project');
+        const forked = await c.forkSession(source, '/tmp/project');
+        assert.notStrictEqual(forked, source);
+        assert.match(forked, /^sess-/);
+        assert.strictEqual(c.getSessionId(), forked);
         c.stop();
     });
 

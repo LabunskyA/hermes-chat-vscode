@@ -8,6 +8,7 @@ import { checkInstalled, readConfigState, SetupWizard } from './setup-wizard';
 import { ChatMessage, ToolCallInfo, UsageInfo } from './types';
 import { UsageStore } from './usage-store';
 import { HermesProfile, ProfileStore } from './profile-store';
+import { createTurnState, inferToolFailure, reduceTurn, TurnState } from './turn-state';
 
 interface AttachedContextFile {
     path: string;
@@ -62,7 +63,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
     private acp: AcpClient | null = null;
     private context: vscode.ExtensionContext;
     private currentAssistantMessage: ChatMessage | null = null;
-    private currentToolCalls = new Map<string, ToolCallInfo>();
+    private currentTurnState: TurnState | null = null;
     private usageStore = new UsageStore();
     private attachedFiles: AttachedContextFile[] = [];
     private resumeFailedNoticeShown = false;
@@ -171,7 +172,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
         this.sessionId = this.context.workspaceState.get(this.sessionKey(), null);
         this.messages = this.context.workspaceState.get<ChatMessage[]>(this.messagesKey(), []);
         this.currentAssistantMessage = null;
-        this.currentToolCalls.clear();
+        this.currentTurnState = null;
         this.restoreAttempted = false;
         this.resumeFailedNoticeShown = false;
         await this.context.workspaceState.update('hermes-chat.activeProfile', profile);
@@ -402,21 +403,6 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
                 `Hermes home: ${hermesHome}`,
             ],
         };
-    }
-
-    private inferToolFailure(rawOutput: unknown): boolean {
-        if (rawOutput == null) return false;
-        const text = typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput);
-        try {
-            const parsed = JSON.parse(text);
-            if (parsed && typeof parsed === 'object') {
-                if (parsed.success === false) return true;
-                if (typeof parsed.error === 'string' && parsed.error.trim()) return true;
-            }
-        } catch {
-            // Ignore non-JSON tool output.
-        }
-        return false;
     }
 
     private async loadAttachedFile(uri: vscode.Uri): Promise<AttachedContextFile> {
@@ -837,13 +823,8 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
         this.syncViewState();
 
         // Prepare new assistant message for streaming
-        this.currentAssistantMessage = {
-            role: 'assistant',
-            content: '',
-            timestamp: Date.now(),
-            toolCalls: [],
-        };
-        this.currentToolCalls.clear();
+        this.currentTurnState = createTurnState();
+        this.currentAssistantMessage = this.currentTurnState.message;
         this.postMessage({ type: 'startAssistantMessage', timestamp: this.currentAssistantMessage.timestamp });
 
         try {
@@ -851,10 +832,11 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
             const result = await client.prompt(query, this.sessionId ?? undefined);
 
             if (this.currentAssistantMessage) {
-                this.currentAssistantMessage.usage = result.usage;
+                const usage = result.usage ?? this.currentAssistantMessage.usage;
+                this.currentAssistantMessage = { ...this.currentAssistantMessage, usage };
                 this.appendMessage(this.currentAssistantMessage);
-                this.postMessage({ type: 'finalizeAssistantMessage', usage: result.usage });
-                if (result.usage) void this.usageStore.record(result.usage);
+                this.postMessage({ type: 'finalizeAssistantMessage', usage });
+                if (usage) void this.usageStore.record(usage);
             }
         } catch (err: unknown) {
             const errorMsg = err instanceof Error ? err.message : String(err);
@@ -862,6 +844,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
         } finally {
             this.isProcessing = false;
             this.currentAssistantMessage = null;
+            this.currentTurnState = null;
             this.postMessage({ type: 'setLoading', loading: false });
             this.syncViewState();
         }
@@ -876,13 +859,14 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
             return;
         }
 
+        if (!this.currentTurnState) return;
+        this.currentTurnState = reduceTurn(this.currentTurnState, update);
+        this.currentAssistantMessage = this.currentTurnState.message;
+
         switch (kind) {
             case 'agent_message_chunk': {
                 const content = update.content as { type: string; text?: string } | undefined;
                 if (content?.type === 'text' && content.text) {
-                    if (this.currentAssistantMessage) {
-                        this.currentAssistantMessage.content += content.text;
-                    }
                     this.postMessage({ type: 'appendAssistantText', text: content.text });
                 }
                 break;
@@ -895,34 +879,13 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
                 break;
             }
             case 'tool_call': {
-                const tc: ToolCallInfo = {
-                    id: update.toolCallId as string,
-                    name: (update.title as string) || (update.kind as string) || 'tool',
-                    status: (update.status as ToolCallInfo['status']) || 'in_progress',
-                    args: update.rawInput,
-                };
-                this.currentToolCalls.set(tc.id, tc);
-                if (this.currentAssistantMessage) {
-                    this.currentAssistantMessage.toolCalls?.push(tc);
-                }
-                this.postMessage({ type: 'toolCall', tool: tc });
+                const tool = this.currentAssistantMessage.toolCalls?.find((item) => item.id === update.toolCallId);
+                if (tool) this.postMessage({ type: 'toolCall', tool });
                 break;
             }
             case 'tool_call_update': {
-                const id = update.toolCallId as string;
-                const existing = this.currentToolCalls.get(id);
-                if (existing) {
-                    if (update.status) existing.status = update.status as ToolCallInfo['status'];
-                    if (update.rawOutput !== undefined) {
-                        existing.result = typeof update.rawOutput === 'string'
-                            ? update.rawOutput
-                            : JSON.stringify(update.rawOutput);
-                        if (this.inferToolFailure(update.rawOutput)) {
-                            existing.status = 'failed';
-                        }
-                    }
-                    this.postMessage({ type: 'toolCallUpdate', tool: existing });
-                }
+                const tool = this.currentAssistantMessage.toolCalls?.find((item) => item.id === update.toolCallId);
+                if (tool) this.postMessage({ type: 'toolCallUpdate', tool });
                 break;
             }
             case 'usage_update': {
@@ -1010,7 +973,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
                         existing.result = typeof update.rawOutput === 'string'
                             ? update.rawOutput
                             : JSON.stringify(update.rawOutput);
-                        if (this.inferToolFailure(update.rawOutput)) {
+                        if (inferToolFailure(update.rawOutput)) {
                             existing.status = 'failed';
                         }
                     }

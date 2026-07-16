@@ -34,6 +34,19 @@ export interface SessionUpdate {
     };
 }
 
+export interface AcpSessionInfo {
+    sessionId: string;
+    cwd?: string;
+    title?: string;
+    updatedAt?: string;
+    [key: string]: unknown;
+}
+
+export interface AcpSessionPage {
+    sessions: AcpSessionInfo[];
+    nextCursor?: string | null;
+}
+
 export interface ToolCall {
     toolCallId: string;
     title?: string;
@@ -375,6 +388,38 @@ export class AcpClient extends EventEmitter {
             cwd,
             mcpServers: [],
         });
+        this.sessionId = result.sessionId;
+        return result.sessionId;
+    }
+
+    async listSessions(cwd?: string, cursor?: string): Promise<AcpSessionPage> {
+        const params: { cwd?: string; cursor?: string } = {};
+        if (cwd) params.cwd = cwd;
+        if (cursor) params.cursor = cursor;
+        return this.request<AcpSessionPage>('session/list', params);
+    }
+
+    async loadSession(sessionId: string, cwd: string): Promise<void> {
+        const result = await this.request<unknown>('session/load', {
+            sessionId,
+            cwd,
+            mcpServers: [],
+        });
+        if (result === null || result === undefined) {
+            throw new Error(`Hermes session not found: ${sessionId}`);
+        }
+        this.sessionId = sessionId;
+    }
+
+    async forkSession(sessionId: string, cwd: string): Promise<string> {
+        const result = await this.request<{ sessionId: string }>('session/fork', {
+            sessionId,
+            cwd,
+            mcpServers: [],
+        });
+        if (!result.sessionId) {
+            throw new Error(`Unable to fork Hermes session: ${sessionId}`);
+        }
         this.sessionId = result.sessionId;
         return result.sessionId;
     }
