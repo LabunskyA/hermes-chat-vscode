@@ -2084,7 +2084,7 @@ body {
     width: min(760px, 100%);
     min-height: 100%;
     margin: 0 auto;
-    padding: 18px 16px 36px;
+    padding: 20px 20px 28px;
 }
 
 .settings-page-header {
@@ -2094,17 +2094,17 @@ body {
     margin-bottom: 22px;
 }
 
-.settings-page-header .icon-btn { flex: 0 0 auto; }
+.settings-page-header .icon-btn { flex: 0 0 auto; margin-top: -2px; }
 .settings-page-heading { min-width: 0; }
-.settings-page-heading h1 { margin: 0; font-size: 18px; font-weight: 600; }
-.settings-page-heading p { margin: 5px 0 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.45; }
+.settings-page-heading h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.01em; }
+.settings-page-heading p { margin: 5px 0 0; color: var(--vscode-descriptionForeground); font-size: 11px; line-height: 1.5; }
 
 .settings-profile-card {
     display: flex;
     align-items: center;
     gap: 11px;
     margin-bottom: 18px;
-    padding: 13px;
+    padding: 14px 15px;
     border: 1px solid var(--vscode-widget-border, #444);
     border-radius: 10px;
     background: color-mix(in srgb, var(--vscode-sideBar-background) 70%, var(--vscode-editor-background) 30%);
@@ -2124,25 +2124,35 @@ body {
 
 .settings-profile-name { font-size: 13px; font-weight: 600; }
 .settings-profile-meta { margin-top: 3px; color: var(--vscode-descriptionForeground); font-size: 10px; }
+.settings-profile-badge {
+    margin-left: auto;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--vscode-testing-iconPassed, #3fb950) 13%, transparent);
+    color: var(--vscode-testing-iconPassed, #3fb950);
+    font-size: 9px;
+    font-weight: 600;
+}
 
 .settings-card {
-    margin-top: 12px;
-    padding: 15px;
+    margin-top: 14px;
+    padding: 17px;
     border: 1px solid var(--vscode-widget-border, #444);
     border-radius: 10px;
     background: color-mix(in srgb, var(--vscode-sideBar-background) 45%, var(--vscode-editor-background) 55%);
 }
 
-.settings-card h2 { margin: 0; font-size: 13px; font-weight: 600; }
-.settings-card > p { margin: 5px 0 14px; color: var(--vscode-descriptionForeground); font-size: 10px; line-height: 1.45; }
-.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.settings-card h2 { margin: 0; font-size: 13px; font-weight: 650; }
+.settings-card > p { margin: 5px 0 16px; color: var(--vscode-descriptionForeground); font-size: 10px; line-height: 1.5; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
 .settings-grid .field { margin: 0; }
 .settings-grid .field.full { grid-column: 1 / -1; }
 .settings-grid label { display: block; margin-bottom: 5px; color: var(--vscode-foreground); font-size: 10px; font-weight: 600; }
 .settings-grid input,
 .settings-grid select {
     width: 100%;
-    padding: 8px 9px;
+    min-height: 38px;
+    padding: 8px 10px;
     border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, #555));
     border-radius: 6px;
     background: var(--vscode-input-background);
@@ -2152,19 +2162,34 @@ body {
 .settings-grid input:focus,
 .settings-grid select:focus { outline: 1px solid var(--vscode-focusBorder); border-color: var(--vscode-focusBorder); }
 .field-help { margin-top: 5px; color: var(--vscode-descriptionForeground); font-size: 9px; line-height: 1.4; }
-.settings-link-list { display: grid; gap: 6px; }
-.settings-link { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--vscode-foreground); text-align: left; cursor: pointer; }
-.settings-link:hover { background: var(--vscode-list-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
-.settings-link span:last-child { color: var(--vscode-descriptionForeground); }
-.settings-page-footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 12px 0; background: color-mix(in srgb, var(--vscode-editor-background) 92%, transparent); backdrop-filter: blur(8px); }
+.settings-link-list { display: grid; gap: 4px; }
+.settings-link { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--vscode-foreground); text-align: left; cursor: pointer; }
+.settings-link:hover { border-color: color-mix(in srgb, var(--vscode-widget-border, #555) 65%, transparent); background: var(--vscode-list-hoverBackground, color-mix(in srgb, var(--vscode-foreground) 8%, transparent)); }
+.settings-link:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+.settings-link-copy { min-width: 0; display: grid; gap: 3px; }
+.settings-link-title { font-size: 11px; font-weight: 500; }
+.settings-link-description { color: var(--vscode-descriptionForeground); font-size: 9px; line-height: 1.35; }
+.settings-link-target { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; color: var(--vscode-descriptionForeground); font-size: 10px; }
+.settings-link-target code { padding: 2px 5px; border-radius: 4px; background: var(--vscode-textCodeBlock-background, color-mix(in srgb, var(--vscode-foreground) 7%, transparent)); font-family: var(--vscode-editor-font-family); font-size: 9px; }
+.settings-link-chevron { font-size: 15px; line-height: 1; transition: transform .12s ease; }
+.settings-link:hover .settings-link-chevron { transform: translateX(2px); color: var(--vscode-foreground); }
+.settings-page-footer { position: sticky; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px -4px 0; padding: 14px 4px 4px; border-top: 1px solid color-mix(in srgb, var(--vscode-widget-border, #555) 55%, transparent); background: color-mix(in srgb, var(--vscode-editor-background) 94%, transparent); backdrop-filter: blur(10px); }
 #settings-save-status { min-height: 16px; color: var(--vscode-descriptionForeground); font-size: 10px; }
 #settings-save-status.ok { color: var(--vscode-testing-iconPassed); }
 #settings-save-status.err { color: var(--vscode-errorForeground); }
-#save-profile-settings { padding: 8px 14px; }
+#settings-save-status.dirty { color: var(--vscode-notificationsWarningIcon-foreground, #cca700); }
+#save-profile-settings { min-width: 112px; padding: 8px 16px; border: 1px solid var(--vscode-button-border, transparent); border-radius: 5px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-weight: 500; cursor: pointer; }
+#save-profile-settings:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
+#save-profile-settings:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+#save-profile-settings:disabled { cursor: default; opacity: .5; }
 
 @media (max-width: 480px) {
+    .settings-page-inner { padding: 16px 12px 22px; }
     .settings-grid { grid-template-columns: 1fr; }
     .settings-grid .field.full { grid-column: auto; }
+    .settings-profile-badge { display: none; }
+    .settings-card { padding: 14px; }
+    .settings-link-description { display: none; }
 }
 
 #messages {
@@ -2688,7 +2713,8 @@ html[data-mode="panel"] #input-area {
             </header>
             <div class="settings-profile-card">
                 <div class="settings-profile-avatar">H</div>
-                <div><div id="settings-profile-name" class="settings-profile-name">default</div><div id="settings-profile-meta" class="settings-profile-meta">Active agent</div></div>
+                <div><div id="settings-profile-name" class="settings-profile-name">default</div><div id="settings-profile-meta" class="settings-profile-meta">Default Hermes agent</div></div>
+                <div class="settings-profile-badge">Active agent</div>
             </div>
             <form id="profile-settings-form">
                 <section class="settings-card">
@@ -2704,17 +2730,17 @@ html[data-mode="panel"] #input-area {
                     <h2>Personality & memory</h2>
                     <p>Edit the files that shape how this agent behaves and what it remembers.</p>
                     <div class="settings-link-list">
-                        <button class="settings-link" type="button" data-settings-memory="soul"><span>Agent personality</span><span>SOUL.md →</span></button>
-                        <button class="settings-link" type="button" data-settings-memory="user"><span>About you</span><span>USER.md →</span></button>
-                        <button class="settings-link" type="button" data-settings-memory="memory"><span>Long-term memory</span><span>MEMORY.md →</span></button>
+                        <button class="settings-link" type="button" data-settings-memory="soul"><span class="settings-link-copy"><span class="settings-link-title">Agent personality</span><span class="settings-link-description">Tone, values, and behavioral instructions</span></span><span class="settings-link-target"><code>SOUL.md</code><span class="settings-link-chevron">›</span></span></button>
+                        <button class="settings-link" type="button" data-settings-memory="user"><span class="settings-link-copy"><span class="settings-link-title">About you</span><span class="settings-link-description">Personal context available to this agent</span></span><span class="settings-link-target"><code>USER.md</code><span class="settings-link-chevron">›</span></span></button>
+                        <button class="settings-link" type="button" data-settings-memory="memory"><span class="settings-link-copy"><span class="settings-link-title">Long-term memory</span><span class="settings-link-description">Facts retained across conversations</span></span><span class="settings-link-target"><code>MEMORY.md</code><span class="settings-link-chevron">›</span></span></button>
                     </div>
                 </section>
                 <section class="settings-card">
                     <h2>Extension</h2>
                     <p>Configure Hermes path, response timeouts, and tool approval behavior in VS Code settings.</p>
-                    <button id="open-extension-settings-page" class="settings-link" type="button"><span>Open extension settings</span><span>→</span></button>
+                    <button id="open-extension-settings-page" class="settings-link" type="button"><span class="settings-link-copy"><span class="settings-link-title">Open extension settings</span><span class="settings-link-description">Path, timeouts, and tool approval</span></span><span class="settings-link-target"><span class="settings-link-chevron">›</span></span></button>
                 </section>
-                <div class="settings-page-footer"><div id="settings-save-status"></div><button id="save-profile-settings" type="submit">Save changes</button></div>
+                <div class="settings-page-footer"><div id="settings-save-status" role="status" aria-live="polite">No unsaved changes</div><button id="save-profile-settings" type="submit" disabled>Save changes</button></div>
             </form>
         </div>
     </section>
@@ -2805,10 +2831,17 @@ function showSettingsPage(settings = initialData.profileSettings || {}, profile 
     settingsKeyHelp.textContent = settings.apiKeyConfigured
         ? 'A key is already configured. Enter a new one only to replace it.'
         : "Keys are stored locally in this agent's private .env file.";
-    settingsSaveStatus.textContent = '';
+    settingsSaveStatus.textContent = 'No unsaved changes';
     settingsSaveStatus.className = '';
+    saveProfileSettings.disabled = true;
     settingsPage.classList.add('visible');
     settingsPage.setAttribute('aria-hidden', 'false');
+}
+
+function markProfileSettingsDirty() {
+    saveProfileSettings.disabled = false;
+    settingsSaveStatus.textContent = 'Unsaved changes';
+    settingsSaveStatus.className = 'dirty';
 }
 
 function hideSettingsPage() {
@@ -3251,6 +3284,7 @@ settingsPopover?.addEventListener('click', (event) => {
 document.getElementById('close-settings-page')?.addEventListener('click', hideSettingsPage);
 document.getElementById('open-extension-settings-page')?.addEventListener('click', () => vscode.postMessage({ type: 'openExtensionSettings' }));
 document.querySelectorAll('[data-settings-memory]').forEach((button) => button.addEventListener('click', () => vscode.postMessage({ type: 'openMemoryFile', file: button.dataset.settingsMemory })));
+[settingsProvider, settingsModel, settingsApiKey].forEach((input) => input.addEventListener('input', markProfileSettingsDirty));
 profileSettingsForm.addEventListener('submit', (event) => {
     event.preventDefault();
     saveProfileSettings.disabled = true;

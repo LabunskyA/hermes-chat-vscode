@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 (2026-07-16)
+
+- Refine the in-chat agent settings page with clearer hierarchy, richer memory links, responsive spacing, and a native primary save action.
+- Add unsaved-change and save-status feedback for per-agent model connection settings.
+- Add tested ACP contracts for listing, loading, and forking Hermes sessions as groundwork for Hermes-backed history.
+- Centralize streamed assistant text, thought, tool-call, and usage updates in a testable turn-state reducer.
+
 ## 0.7.0 (2026-07-16)
 
 - Add persistent, isolated Hermes agents backed by native profiles, with agent switching, creation, per-agent sessions, chat history, memory, and model settings.

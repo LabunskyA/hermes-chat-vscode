@@ -2,7 +2,7 @@
   "name": "hermes-chat",
   "displayName": "Hermes Agent Chat",
   "description": "Persistent multi-agent Hermes chat with streaming ACP tools, workspace context, per-agent settings, memory, and history",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "publisher": "Poppywu124",
   "license": "MIT",
   "repository": {
