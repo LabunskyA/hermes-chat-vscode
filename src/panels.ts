@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { UsageStore, AggregatedUsage } from './usage-store';
 
-const HERMES_HOME = path.join(os.homedir(), '.hermes');
+const HERMES_HOME = process.env.HERMES_HOME || path.join(os.homedir(), '.hermes');
 
 // ============================================================
 // Memory Panel
