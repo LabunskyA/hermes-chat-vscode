@@ -3,7 +3,7 @@ import * as os from 'os';
 import { promises as fs } from 'fs';
 import { UsageInfo } from './types';
 
-const USAGE_DIR = path.join(os.homedir(), '.hermes', 'usage');
+const USAGE_DIR = path.join(process.env.HERMES_HOME || path.join(os.homedir(), '.hermes'), 'usage');
 const USAGE_FILE = path.join(USAGE_DIR, 'usage.jsonl');
 
 interface UsageRecord {
