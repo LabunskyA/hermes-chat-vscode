@@ -272,7 +272,7 @@ export class HermesChatViewProvider implements vscode.WebviewViewProvider {
     }
 
     private getHermesHome(): string {
-        return path.join(os.homedir(), '.hermes');
+        return  process.env.HERMES_HOME || path.join(os.homedir(), '.hermes');
     }
 
     private readHermesConfigText(): string {
