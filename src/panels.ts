@@ -265,6 +265,12 @@ const PROVIDER_MODELS: Record<string, string[]> = {
         'gpt-4.1',
         'gpt-4o',
     ],
+    deepseek: [
+        'deepseek-v4-flash',
+        'deepseek-v4-pro',
+        'deepseek-chat',
+        'deepseek-reasoner',
+    ],
 };
 
 function readHermesConfig(): HermesConfig {
